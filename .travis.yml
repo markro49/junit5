@@ -8,6 +8,8 @@ branches:
   except:
     - /^r\d.*$/
 
+## NOTE: The JUnit 5 build requires Java 9 or higher.
+## Thus, it will fail until the Checker Framework supports Java 9 and higher.
 matrix:
   include:
 # Java 9 "Oracle JDK" (provided by Travis CI)
