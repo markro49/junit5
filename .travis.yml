@@ -40,6 +40,7 @@ cache:
   directories:
     - $HOME/.gradle/caches/
     - $HOME/.gradle/wrapper/
+    - $HOME/.m2/
 
 # Run clover report and send report to codecov after build success for JDK 9 builds
 after_success:
