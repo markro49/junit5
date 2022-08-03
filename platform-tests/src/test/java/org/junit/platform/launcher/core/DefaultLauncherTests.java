@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2021 the original author or authors.
+ * Copyright 2015-2022 the original author or authors.
  *
  * All rights reserved. This program and the accompanying materials are
  * made available under the terms of the Eclipse Public License v2.0 which
@@ -10,7 +10,6 @@
 
 package org.junit.platform.launcher.core;
 
-import static java.util.stream.Collectors.toList;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -19,8 +18,6 @@ import static org.junit.platform.commons.util.CollectionUtils.getOnlyElement;
 import static org.junit.platform.engine.TestExecutionResult.successful;
 import static org.junit.platform.engine.discovery.DiscoverySelectors.selectPackage;
 import static org.junit.platform.engine.discovery.DiscoverySelectors.selectUniqueId;
-import static org.junit.platform.launcher.EngineFilter.excludeEngines;
-import static org.junit.platform.launcher.EngineFilter.includeEngines;
 import static org.junit.platform.launcher.core.LauncherDiscoveryRequestBuilder.DEFAULT_DISCOVERY_LISTENER_CONFIGURATION_PROPERTY_NAME;
 import static org.junit.platform.launcher.core.LauncherDiscoveryRequestBuilder.request;
 import static org.junit.platform.launcher.core.LauncherFactoryForTestingPurposesOnly.createLauncher;
@@ -371,117 +368,6 @@ class DefaultLauncherTests {
 	}
 
 	@Test
-	void launcherWillNotExecuteEnginesIfNotIncludedByAnEngineFilter() {
-		var firstEngine = new DemoHierarchicalTestEngine("first");
-		TestDescriptor test1 = firstEngine.addTest("test1", noOp);
-		var secondEngine = new DemoHierarchicalTestEngine("second");
-		TestDescriptor test2 = secondEngine.addTest("test2", noOp);
-
-		var launcher = createLauncher(firstEngine, secondEngine);
-
-		// @formatter:off
-		var testPlan = launcher.discover(
-			request()
-				.selectors(selectUniqueId(test1.getUniqueId()), selectUniqueId(test2.getUniqueId()))
-				.filters(includeEngines("first"))
-				.build());
-		// @formatter:on
-
-		assertThat(testPlan.getRoots()).hasSize(1);
-		var rootIdentifier = testPlan.getRoots().iterator().next();
-		assertThat(testPlan.getChildren(rootIdentifier.getUniqueId())).hasSize(1);
-		assertThat(testPlan.getChildren(UniqueId.forEngine("first").toString())).hasSize(1);
-	}
-
-	@Test
-	void launcherWillExecuteAllEnginesExplicitlyIncludedViaSingleEngineFilter() {
-		var firstEngine = new DemoHierarchicalTestEngine("first");
-		TestDescriptor test1 = firstEngine.addTest("test1", noOp);
-		var secondEngine = new DemoHierarchicalTestEngine("second");
-		TestDescriptor test2 = secondEngine.addTest("test2", noOp);
-
-		var launcher = createLauncher(firstEngine, secondEngine);
-
-		// @formatter:off
-		var testPlan = launcher.discover(
-			request()
-				.selectors(selectUniqueId(test1.getUniqueId()), selectUniqueId(test2.getUniqueId()))
-				.filters(includeEngines("first", "second"))
-				.build());
-		// @formatter:on
-
-		assertThat(testPlan.getRoots()).hasSize(2);
-	}
-
-	@Test
-	void launcherWillNotExecuteEnginesExplicitlyIncludedViaMultipleCompetingEngineFilters() {
-		var firstEngine = new DemoHierarchicalTestEngine("first");
-		TestDescriptor test1 = firstEngine.addTest("test1", noOp);
-		var secondEngine = new DemoHierarchicalTestEngine("second");
-		TestDescriptor test2 = secondEngine.addTest("test2", noOp);
-
-		var launcher = createLauncher(firstEngine, secondEngine);
-
-		// @formatter:off
-		var testPlan = launcher.discover(
-			request()
-				.selectors(selectUniqueId(test1.getUniqueId()), selectUniqueId(test2.getUniqueId()))
-				.filters(includeEngines("first"), includeEngines("second"))
-				.build());
-		// @formatter:on
-
-		assertThat(testPlan.getRoots()).isEmpty();
-	}
-
-	@Test
-	void launcherWillNotExecuteEnginesExplicitlyExcludedByAnEngineFilter() {
-		var firstEngine = new DemoHierarchicalTestEngine("first");
-		TestDescriptor test1 = firstEngine.addTest("test1", noOp);
-		var secondEngine = new DemoHierarchicalTestEngine("second");
-		TestDescriptor test2 = secondEngine.addTest("test2", noOp);
-
-		var launcher = createLauncher(firstEngine, secondEngine);
-
-		// @formatter:off
-		var testPlan = launcher.discover(
-			request()
-				.selectors(selectUniqueId(test1.getUniqueId()), selectUniqueId(test2.getUniqueId()))
-				.filters(excludeEngines("second"))
-				.build());
-		// @formatter:on
-
-		assertThat(testPlan.getRoots()).hasSize(1);
-		var rootIdentifier = testPlan.getRoots().iterator().next();
-		assertThat(testPlan.getChildren(rootIdentifier.getUniqueId())).hasSize(1);
-		assertThat(testPlan.getChildren(UniqueId.forEngine("first").toString())).hasSize(1);
-	}
-
-	@Test
-	void launcherWillExecuteEnginesHonoringBothIncludeAndExcludeEngineFilters() {
-		var firstEngine = new DemoHierarchicalTestEngine("first");
-		TestDescriptor test1 = firstEngine.addTest("test1", noOp);
-		var secondEngine = new DemoHierarchicalTestEngine("second");
-		TestDescriptor test2 = secondEngine.addTest("test2", noOp);
-		var thirdEngine = new DemoHierarchicalTestEngine("third");
-		TestDescriptor test3 = thirdEngine.addTest("test3", noOp);
-
-		var launcher = createLauncher(firstEngine, secondEngine, thirdEngine);
-
-		// @formatter:off
-		var testPlan = launcher.discover(
-			request()
-				.selectors(selectUniqueId(test1.getUniqueId()), selectUniqueId(test2.getUniqueId()), selectUniqueId(test3.getUniqueId()))
-				.filters(includeEngines("first", "second"), excludeEngines("second"))
-				.build());
-		// @formatter:on
-
-		assertThat(testPlan.getRoots()).hasSize(1);
-		var rootIdentifier = testPlan.getRoots().iterator().next();
-		assertThat(testPlan.getChildren(rootIdentifier.getUniqueId())).hasSize(1);
-		assertThat(testPlan.getChildren(UniqueId.forEngine("first").toString())).hasSize(1);
-	}
-
-	@Test
 	void launcherAppliesPostDiscoveryFilters() {
 		var engine = new DemoHierarchicalTestEngine("myEngine");
 		var test1 = engine.addTest("test1", noOp);
@@ -506,6 +392,7 @@ class DefaultLauncherTests {
 	}
 
 	@Test
+	@SuppressWarnings("deprecation")
 	void withoutConfigurationParameters_LauncherPassesEmptyConfigurationParametersIntoTheExecutionRequest() {
 		var engine = new TestEngineSpy();
 
@@ -518,6 +405,7 @@ class DefaultLauncherTests {
 	}
 
 	@Test
+	@SuppressWarnings("deprecation")
 	void withConfigurationParameters_LauncherPassesPopulatedConfigurationParametersIntoTheExecutionRequest() {
 		var engine = new TestEngineSpy();
 
@@ -531,6 +419,7 @@ class DefaultLauncherTests {
 	}
 
 	@Test
+	@SuppressWarnings("deprecation")
 	void withoutConfigurationParameters_LookupFallsBackToSystemProperty() {
 		System.setProperty(FOO, BAR);
 
@@ -684,9 +573,8 @@ class DefaultLauncherTests {
 	}
 
 	@Test
-	@TrackLogRecords
 	@SuppressWarnings("deprecation")
-	void testPlanWarnsWhenModified(LogRecordListener listener) {
+	void testPlanThrowsExceptionWhenModified() {
 		TestEngine engine = new TestEngineSpy();
 		var launcher = createLauncher(engine);
 		var testPlan = launcher.discover(request().build());
@@ -696,14 +584,11 @@ class DefaultLauncherTests {
 
 		var addedIdentifier = TestIdentifier.from(
 			new TestDescriptorStub(engineUniqueId.append("test", "test2"), "test2"));
-		testPlan.add(addedIdentifier);
-		testPlan.add(addedIdentifier);
 
+		var exception = assertThrows(JUnitException.class, () -> testPlan.add(addedIdentifier));
+		assertThat(exception).hasMessage("Unsupported attempt to modify the TestPlan was detected. "
+				+ "Please contact your IDE/tool vendor and request a fix or downgrade to JUnit 5.7.x (see https://github.com/junit-team/junit5/issues/1732 for details).");
 		assertThat(testPlan.getChildren(engineIdentifier)).hasSize(1).doesNotContain(addedIdentifier);
-		assertThat(listener.stream(InternalTestPlan.class, Level.WARNING).map(LogRecord::getMessage).collect(
-			toList())).containsExactly("Attempt to modify the TestPlan was detected. " //
-					+ "A future version of the JUnit Platform will ignore this call and eventually even throw an exception. " //
-					+ "Please contact your IDE/tool vendor and request a fix (see https://github.com/junit-team/junit5/issues/1732 for details).");
 	}
 
 	@Test

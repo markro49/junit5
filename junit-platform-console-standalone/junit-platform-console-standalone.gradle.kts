@@ -1,5 +1,3 @@
-import aQute.bnd.gradle.BundleTaskConvention;
-
 plugins {
 	`java-library-conventions`
 	`shadow-conventions`
@@ -8,11 +6,15 @@ plugins {
 description = "JUnit Platform Console Standalone"
 
 dependencies {
-	shadowed(projects.platform.reporting)
-	shadowed(projects.platform.console)
-	shadowed(projects.jupiter.engine)
-	shadowed(projects.jupiter.params)
-	shadowed(projects.vintage.engine)
+	shadowed(projects.junitPlatformReporting)
+	shadowed(projects.junitPlatformConsole)
+	shadowed(projects.junitPlatformSuite)
+	shadowed(projects.junitJupiterEngine)
+	shadowed(projects.junitJupiterParams)
+	shadowed(projects.junitVintageEngine)
+	shadowed(libs.apiguardian) {
+		because("downstream projects need it to avoid compiler warnings")
+	}
 }
 
 val jupiterVersion = rootProject.version
@@ -24,24 +26,44 @@ tasks {
 			attributes("Main-Class" to "org.junit.platform.console.ConsoleLauncher")
 		}
 	}
+	val shadowedArtifactsFile by registering {
+		inputs.files(configurations.shadowed).withNormalizer(ClasspathNormalizer::class)
+		val outputFile = layout.buildDirectory.file("shadowed-artifacts")
+		outputs.file(outputFile)
+		doFirst {
+			outputFile.get().asFile.printWriter().use { out ->
+				configurations.shadowed.get().resolvedConfiguration.resolvedArtifacts
+					.map { it.moduleVersion.id }
+					.map { "${it.group}:${it.name}:${it.version}" }
+					.sorted()
+					.forEach(out::println)
+			}
+		}
+	}
 	shadowJar {
+		// https://github.com/junit-team/junit5/issues/2557
+		// exclude compiled module declarations from any source (e.g. /*, /META-INF/versions/N/*)
+		exclude("**/module-info.class")
 		// https://github.com/junit-team/junit5/issues/761
 		// prevent duplicates, add 3rd-party licenses explicitly
 		exclude("META-INF/LICENSE*.md")
-		from(project.projects.platform.console.projectDir) {
+		from(project.projects.junitPlatformConsole.dependencyProject.projectDir) {
 			include("LICENSE-picocli.md")
 			into("META-INF")
 		}
-		from(project.projects.jupiter.params.projectDir) {
+		from(project.projects.junitJupiterParams.dependencyProject.projectDir) {
 			include("LICENSE-univocity-parsers.md")
 			into("META-INF")
 		}
+		from(shadowedArtifactsFile) {
+			into("META-INF")
+		}
 
-		withConvention(BundleTaskConvention::class) {
+		bundle {
 			bnd("""
 				# Customize the imports because this is an aggregate jar
 				Import-Package: \
-					!org.apiguardian.api,\
+					${extra["importAPIGuardian"]},\
 					kotlin.*;resolution:="optional",\
 					*
 				# Disable the APIGuardian plugin since everything was already

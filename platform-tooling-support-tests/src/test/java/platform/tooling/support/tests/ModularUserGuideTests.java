@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2021 the original author or authors.
+ * Copyright 2015-2022 the original author or authors.
  *
  * All rights reserved. This program and the accompanying materials are
  * made available under the terms of the Eclipse Public License v2.0 which
@@ -28,36 +28,44 @@ import java.util.spi.ToolProvider;
 import org.codehaus.groovy.runtime.ProcessGroovyMethods;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+
 import platform.tooling.support.Helper;
+import platform.tooling.support.ThirdPartyJars;
 
 /**
  * @since 1.5
  */
 class ModularUserGuideTests {
 
-	private static final List<String> DOCUMENTATION_MODULE_DESCRIPTOR = List.of( //
-		"open module documentation {", //
-		"  exports example.testkit;", // just here to ensure documentation example sources are compiled
-		//
-		"  requires org.junit.jupiter.api;", //
-		"  requires org.junit.jupiter.migrationsupport;", //
-		"  requires org.junit.jupiter.params;", //
-		//
-		"  requires org.junit.platform.engine;", //
-		"  requires org.junit.platform.reporting;", //
-		"  requires org.junit.platform.runner;", //
-		"  requires org.junit.platform.testkit;", //
-		//
-		"  requires java.desktop;", //
-		"  requires java.logging;", //
-		"  requires java.scripting;", //
-		"}", //
-		"" //
-	);
+	private static final String DOCUMENTATION_MODULE_DESCRIPTOR = """
+			open module documentation {
+			  exports example.testkit; // just here to ensure documentation example sources are compiled
+
+			  requires org.junit.jupiter.api;
+			  requires org.junit.jupiter.migrationsupport;
+			  requires org.junit.jupiter.params;
+
+			  requires org.junit.platform.engine;
+			  requires org.junit.platform.reporting;
+			  requires org.junit.platform.runner;
+			  requires org.junit.platform.testkit;
+
+			  // Byte Buddy is used by AssertJ's soft assertions which are used by the Engine Test Kit
+			  requires net.bytebuddy;
+
+			  requires java.desktop;
+			  requires java.logging;
+			  requires java.scripting;
+			  requires jdk.httpserver;
+
+			  provides org.junit.platform.launcher.LauncherSessionListener
+			    with example.session.GlobalSetupTeardownListener;
+			}
+			""";
 
 	private static List<String> compile(Path temp, Writer out, Writer err) throws Exception {
 		var documentation = Files.createDirectories(temp.resolve("src/documentation"));
-		Files.write(documentation.resolve("module-info.java"), DOCUMENTATION_MODULE_DESCRIPTOR);
+		Files.writeString(documentation.resolve("module-info.java"), DOCUMENTATION_MODULE_DESCRIPTOR);
 
 		var args = new ArrayList<String>();
 		args.add("-Xlint"); // enable all default warnings
@@ -69,11 +77,13 @@ class ModularUserGuideTests {
 		args.add(temp.resolve("destination").toString());
 
 		var lib = Files.createDirectories(temp.resolve("lib"));
-		Helper.load(lib, "junit", "junit", Helper.version("junit4", "4.13.2"));
-		Helper.load(lib, "org.assertj", "assertj-core", Helper.version("assertJ", "3.14.0"));
-		Helper.load(lib, "org.apiguardian", "apiguardian-api", Helper.version("apiGuardian", "1.1.0"));
-		Helper.load(lib, "org.hamcrest", "hamcrest", Helper.version("hamcrest", "2.2"));
-		Helper.load(lib, "org.opentest4j", "opentest4j", Helper.version("ota4j", "1.2.0"));
+		ThirdPartyJars.copy(lib, "junit", "junit");
+		ThirdPartyJars.copy(lib, "org.assertj", "assertj-core");
+		// Byte Buddy is used by AssertJ's soft assertions which are used by the Engine Test Kit
+		ThirdPartyJars.copy(lib, "net.bytebuddy", "byte-buddy");
+		ThirdPartyJars.copy(lib, "org.apiguardian", "apiguardian-api");
+		ThirdPartyJars.copy(lib, "org.hamcrest", "hamcrest");
+		ThirdPartyJars.copy(lib, "org.opentest4j", "opentest4j");
 		Helper.loadAllJUnitModules(lib);
 		args.add("--module-path");
 		args.add(lib.toString());
@@ -133,6 +143,9 @@ class ModularUserGuideTests {
 
 		command.add("--scan-modules");
 
+		command.add("--config");
+		command.add("enableHttpServer=true");
+
 		command.add("--fail-if-no-tests");
 		command.add("--include-classname");
 		command.add(".*Tests");
@@ -164,7 +177,7 @@ class ModularUserGuideTests {
 		var args = compile(temp, out, err);
 		// args.forEach(System.out::println);
 
-		assertTrue(err.toString().isBlank(), () -> err.toString() + "\n\n" + String.join("\n", args));
+		assertTrue(err.toString().isBlank(), () -> err + "\n\n" + String.join("\n", args));
 		var listing = Helper.treeWalk(temp);
 		assertLinesMatch(List.of( //
 			"destination", //
@@ -172,6 +185,7 @@ class ModularUserGuideTests {
 			"lib", //
 			"lib/apiguardian-api-.+\\.jar", //
 			"lib/assertj-core-.+\\.jar", //
+			"lib/byte-buddy-.+", //
 			"lib/hamcrest-.+\\.jar", //
 			"lib/junit-.+\\.jar", //
 			">> ALL JUNIT 5 JARS >>", //
@@ -185,4 +199,5 @@ class ModularUserGuideTests {
 
 		junit(temp, out, err);
 	}
+
 }

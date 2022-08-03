@@ -8,8 +8,9 @@ plugins {
 description = "JUnit Platform Commons"
 
 dependencies {
-	api(platform(projects.bom))
-	api(libs.apiguardian)
+	api(platform(projects.junitBom))
+
+	compileOnlyApi(libs.apiguardian)
 }
 
 tasks.jar {

@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2021 the original author or authors.
+ * Copyright 2015-2022 the original author or authors.
  *
  * All rights reserved. This program and the accompanying materials are
  * made available under the terms of the Eclipse Public License v2.0 which
@@ -15,6 +15,7 @@ import static java.util.Collections.synchronizedSet;
 import static java.util.Collections.unmodifiableSet;
 import static org.apiguardian.api.API.Status.DEPRECATED;
 import static org.apiguardian.api.API.Status.INTERNAL;
+import static org.apiguardian.api.API.Status.MAINTAINED;
 import static org.apiguardian.api.API.Status.STABLE;
 
 import java.util.Collection;
@@ -26,8 +27,10 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Predicate;
 
 import org.apiguardian.api.API;
+import org.junit.platform.commons.JUnitException;
 import org.junit.platform.commons.PreconditionViolationException;
 import org.junit.platform.commons.util.Preconditions;
+import org.junit.platform.engine.ConfigurationParameters;
 import org.junit.platform.engine.TestDescriptor;
 import org.junit.platform.engine.TestDescriptor.Visitor;
 import org.junit.platform.engine.UniqueId;
@@ -66,6 +69,8 @@ public class TestPlan {
 
 	private final boolean containsTests;
 
+	private final ConfigurationParameters configurationParameters;
+
 	/**
 	 * Construct a new {@code TestPlan} from the supplied collection of
 	 * {@link TestDescriptor TestDescriptors}.
@@ -75,43 +80,65 @@ public class TestPlan {
 	 *
 	 * @param engineDescriptors the engine test descriptors from which the test
 	 * plan should be created; never {@code null}
+	 * @param configurationParameters the {@code ConfigurationParameters} for
+	 * this test plan; never {@code null}
 	 * @return a new test plan
 	 */
 	@API(status = INTERNAL, since = "1.0")
-	public static TestPlan from(Collection<TestDescriptor> engineDescriptors) {
+	public static TestPlan from(Collection<TestDescriptor> engineDescriptors,
+			ConfigurationParameters configurationParameters) {
 		Preconditions.notNull(engineDescriptors, "Cannot create TestPlan from a null collection of TestDescriptors");
-		TestPlan testPlan = new TestPlan(engineDescriptors.stream().anyMatch(TestDescriptor::containsTests));
-		Visitor visitor = descriptor -> testPlan.add(TestIdentifier.from(descriptor));
+		Preconditions.notNull(configurationParameters, "Cannot create TestPlan from null ConfigurationParameters");
+		TestPlan testPlan = new TestPlan(engineDescriptors.stream().anyMatch(TestDescriptor::containsTests),
+			configurationParameters);
+		Visitor visitor = descriptor -> testPlan.addInternal(TestIdentifier.from(descriptor));
 		engineDescriptors.forEach(engineDescriptor -> engineDescriptor.accept(visitor));
 		return testPlan;
 	}
 
 	@API(status = INTERNAL, since = "1.4")
-	protected TestPlan(boolean containsTests) {
+	protected TestPlan(boolean containsTests, ConfigurationParameters configurationParameters) {
 		this.containsTests = containsTests;
+		this.configurationParameters = configurationParameters;
 	}
 
 	/**
 	 * Add the supplied {@link TestIdentifier} to this test plan.
 	 *
 	 * @param testIdentifier the identifier to add; never {@code null}
-	 * @deprecated Please discontinue use of this method. A future version of the
-	 * JUnit Platform will ignore this call and eventually even throw an exception.
+	 * @deprecated Calling this method is no longer supported and will throw an
+	 * exception.
+	 * @throws JUnitException always
 	 */
 	@Deprecated
 	@API(status = DEPRECATED, since = "1.4")
-	public void add(TestIdentifier testIdentifier) {
+	public void add(@SuppressWarnings("unused") TestIdentifier testIdentifier) {
+		throw new JUnitException("Unsupported attempt to modify the TestPlan was detected. "
+				+ "Please contact your IDE/tool vendor and request a fix or downgrade to JUnit 5.7.x (see https://github.com/junit-team/junit5/issues/1732 for details).");
+	}
+
+	@API(status = INTERNAL, since = "1.8")
+	public void addInternal(TestIdentifier testIdentifier) {
 		Preconditions.notNull(testIdentifier, "testIdentifier must not be null");
 		allIdentifiers.put(testIdentifier.getUniqueIdObject(), testIdentifier);
-		if (testIdentifier.getParentIdObject().isPresent()) {
-			UniqueId parentId = testIdentifier.getParentIdObject().get();
-			Set<TestIdentifier> directChildren = children.computeIfAbsent(parentId,
-				key -> synchronizedSet(new LinkedHashSet<>(16)));
-			directChildren.add(testIdentifier);
-		}
-		else {
+
+		// Root identifiers. Typically, a test engine.
+		if (!testIdentifier.getParentIdObject().isPresent()) {
 			roots.add(testIdentifier);
+			return;
 		}
+
+		// Identifiers without a parent in this test plan. Could be a test
+		// engine that is used in a suite.
+		UniqueId parentId = testIdentifier.getParentIdObject().get();
+		if (!allIdentifiers.containsKey(parentId)) {
+			roots.add(testIdentifier);
+			return;
+		}
+
+		Set<TestIdentifier> directChildren = children.computeIfAbsent(parentId,
+			key -> synchronizedSet(new LinkedHashSet<>(16)));
+		directChildren.add(testIdentifier);
 	}
 
 	/**
@@ -220,6 +247,17 @@ public class TestPlan {
 	 */
 	public boolean containsTests() {
 		return containsTests;
+	}
+
+	/**
+	 * Get the {@link ConfigurationParameters} for this test plan.
+	 *
+	 * @return the configuration parameters; never {@code null}
+	 * @since 1.8
+	 */
+	@API(status = MAINTAINED, since = "1.8")
+	public ConfigurationParameters getConfigurationParameters() {
+		return this.configurationParameters;
 	}
 
 }

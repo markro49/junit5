@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2021 the original author or authors.
+ * Copyright 2015-2022 the original author or authors.
  *
  * All rights reserved. This program and the accompanying materials are
  * made available under the terms of the Eclipse Public License v2.0 which
@@ -21,8 +21,12 @@ import org.apiguardian.api.API;
 import org.apiguardian.api.API.Status;
 
 /**
- * {@code @Configurations} is a container for one or more
- * {@link ConfigurationParameter @Configuration} declarations.
+ * {@code @ConfigurationParameters} is a container for one or more
+ * {@link ConfigurationParameter @ConfigurationParameter} declarations.
+ *
+ * <p>Note, however, that use of the {@code @ConfigurationParameters} container
+ * is completely optional since {@code @ConfigurationParameter} is a
+ * {@linkplain java.lang.annotation.Repeatable repeatable} annotation.
  *
  * @since 1.8
  * @see ConfigurationParameter
@@ -35,7 +39,8 @@ import org.apiguardian.api.API.Status;
 public @interface ConfigurationParameters {
 
 	/**
-	 * An array of one or more {@link ConfigurationParameter Configurations}.
+	 * An array of one or more {@link ConfigurationParameter @ConfigurationParameter}
+	 * declarations.
 	 */
 	ConfigurationParameter[] value();
 }

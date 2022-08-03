@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2021 the original author or authors.
+ * Copyright 2015-2022 the original author or authors.
  *
  * All rights reserved. This program and the accompanying materials are
  * made available under the terms of the Eclipse Public License v2.0 which
@@ -38,7 +38,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
  * custom <em>composed annotation</em> that inherits the semantics of this
  * annotation.
  *
- * <h4>Warning</h4>
+ * <h2>Warning</h2>
  *
  * <p>As of JUnit Jupiter 5.1, this annotation can only be declared once on an
  * {@link java.lang.reflect.AnnotatedElement AnnotatedElement} (i.e., test
@@ -80,7 +80,14 @@ public @interface EnabledOnJre {
 	JRE[] value();
 
 	/**
-	 * Reason to provide if the test of container ends up being disabled.
+	 * Custom reason to provide if the test or container is disabled.
+	 *
+	 * <p>If a custom reason is supplied, it will be combined with the default
+	 * reason for this annotation. If a custom reason is not supplied, the default
+	 * reason will be used.
+	 *
+	 * @since 5.7
 	 */
+	@API(status = STABLE, since = "5.7")
 	String disabledReason() default "";
 }

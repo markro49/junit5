@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2021 the original author or authors.
+ * Copyright 2015-2022 the original author or authors.
  *
  * All rights reserved. This program and the accompanying materials are
  * made available under the terms of the Eclipse Public License v2.0 which
@@ -15,6 +15,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Named.named;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
 import static org.junit.jupiter.params.provider.EnumSource.Mode.EXCLUDE;
 import static org.junit.jupiter.params.provider.EnumSource.Mode.MATCH_ALL;
@@ -40,7 +41,6 @@ import example.util.StringUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Named;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.TestInfo;
 import org.junit.jupiter.api.TestReporter;
@@ -236,6 +236,13 @@ class ParameterizedTestDemo {
 		assertNotNull(country);
 		assertNotEquals(0, reference);
 	}
+
+	@ParameterizedTest(name = "[{index}] {arguments}")
+	@CsvFileSource(resources = "/two-column.csv", useHeadersInDisplayName = true)
+	void testWithCsvFileSourceAndHeaders(String country, int reference) {
+		assertNotNull(country);
+		assertNotEquals(0, reference);
+	}
 	// end::CsvFileSource_example[]
 
 	// tag::ArgumentsSource_example[]
@@ -347,7 +354,7 @@ class ParameterizedTestDemo {
 
 		@Override
 		protected Integer convert(String source) {
-			return source.length();
+			return (source != null ? source.length() : 0);
 		}
 
 	}
@@ -444,6 +451,7 @@ class ParameterizedTestDemo {
 	}
 	// end::custom_display_names[]
 
+	// @formatter:off
 	// tag::named_arguments[]
 	@DisplayName("A parameterized test with named arguments")
 	@ParameterizedTest(name = "{index}: {0}")
@@ -452,8 +460,11 @@ class ParameterizedTestDemo {
 	}
 
 	static Stream<Arguments> namedArguments() {
-		return Stream.of(arguments(Named.of("An important file", new File("path1"))),
-			arguments(Named.of("Another file", new File("path2"))));
+		return Stream.of(
+			arguments(named("An important file", new File("path1"))),
+			arguments(named("Another file", new File("path2")))
+		);
 	}
 	// end::named_arguments[]
+	// @formatter:on
 }

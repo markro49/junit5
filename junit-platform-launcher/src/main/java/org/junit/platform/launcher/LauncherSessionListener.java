@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2021 the original author or authors.
+ * Copyright 2015-2022 the original author or authors.
  *
  * All rights reserved. This program and the accompanying materials are
  * made available under the terms of the Eclipse Public License v2.0 which
@@ -17,12 +17,15 @@ import org.junit.platform.launcher.core.LauncherConfig;
 import org.junit.platform.launcher.core.LauncherFactory;
 
 /**
- * Register an implementation of this interface with the
- * {@link LauncherConfig.Builder#addLauncherSessionListeners LauncherConfig}
- * passed to
- * {@link LauncherFactory#openSession(LauncherConfig) LauncherFactory} or via
- * ServiceLoader to be notified when a {@link LauncherSession} is opened and
- * closed.
+ * Register an implementation of this interface to be notified when a
+ * {@link LauncherSession} is opened and closed.
+ *
+ * <p>A {@code LauncherSessionListener} can be registered programmatically with
+ * the {@link LauncherConfig.Builder#addLauncherSessionListeners LauncherConfig}
+ * passed to the
+ * {@link LauncherFactory#openSession(LauncherConfig) LauncherFactory} or
+ * automatically via Java's {@link java.util.ServiceLoader ServiceLoader}
+ * mechanism.
  *
  * <p>All methods in this class have empty <em>default</em> implementations.
  * Subclasses may therefore override one or more of these methods to be notified
@@ -31,10 +34,10 @@ import org.junit.platform.launcher.core.LauncherFactory;
  * <p>The methods declared in this interface are called by the {@link Launcher}
  * or {@link LauncherSession} created via the {@link LauncherFactory}.
  *
+ * @since 1.8
  * @see LauncherSession
  * @see LauncherConfig.Builder#addLauncherSessionListeners
  * @see LauncherFactory
- * @since 1.8
  */
 @API(status = EXPERIMENTAL, since = "1.8")
 public interface LauncherSessionListener {

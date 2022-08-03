@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2021 the original author or authors.
+ * Copyright 2015-2022 the original author or authors.
  *
  * All rights reserved. This program and the accompanying materials are
  * made available under the terms of the Eclipse Public License v2.0 which
@@ -12,8 +12,7 @@ package org.junit.jupiter.api;
 
 import static java.lang.String.format;
 import static java.lang.String.join;
-import static org.junit.jupiter.api.AssertionUtils.buildPrefix;
-import static org.junit.jupiter.api.AssertionUtils.nullSafeGet;
+import static org.junit.jupiter.api.AssertionFailureBuilder.assertionFailure;
 import static org.junit.platform.commons.util.Preconditions.condition;
 import static org.junit.platform.commons.util.Preconditions.notNull;
 
@@ -136,10 +135,10 @@ class AssertLinesMatch {
 				// fast-forward marker found in expected line: fast-forward actual line...
 				if (isFastForwardLine(expectedLine)) {
 					int fastForwardLimit = parseFastForwardLimit(expectedLine);
+					int actualRemaining = actualDeque.size();
 
 					// trivial case: fast-forward marker was in last expected line
 					if (expectedDeque.isEmpty()) {
-						int actualRemaining = actualDeque.size();
 						// no limit given or perfect match? we're done.
 						if (fastForwardLimit == Integer.MAX_VALUE || fastForwardLimit == actualRemaining) {
 							return;
@@ -150,6 +149,10 @@ class AssertLinesMatch {
 
 					// fast-forward limit was given: use it
 					if (fastForwardLimit != Integer.MAX_VALUE) {
+						if (actualRemaining < fastForwardLimit) {
+							fail("fast-forward(%d) error: not enough actual lines remaining (%s)", fastForwardLimit,
+								actualRemaining);
+						}
 						// fast-forward now: actualDeque.pop(fastForwardLimit)
 						for (int i = 0; i < fastForwardLimit; i++) {
 							actualDeque.pop();
@@ -191,8 +194,13 @@ class AssertLinesMatch {
 
 		void fail(String format, Object... args) {
 			String newLine = System.lineSeparator();
-			String message = buildPrefix(nullSafeGet(messageOrSupplier)) + format(format, args);
-			AssertionUtils.fail(message, join(newLine, expectedLines), join(newLine, actualLines));
+			assertionFailure() //
+					.message(messageOrSupplier) //
+					.reason(format(format, args)) //
+					.expected(join(newLine, expectedLines)) //
+					.actual(join(newLine, actualLines)) //
+					.includeValuesInMessage(false) //
+					.buildAndThrow();
 		}
 	}
 
@@ -202,7 +210,8 @@ class AssertLinesMatch {
 	}
 
 	static int parseFastForwardLimit(String fastForwardLine) {
-		String text = fastForwardLine.trim().substring(2, fastForwardLine.length() - 2).trim();
+		fastForwardLine = fastForwardLine.trim();
+		String text = fastForwardLine.substring(2, fastForwardLine.length() - 2).trim();
 		try {
 			int limit = Integer.parseInt(text);
 			condition(limit > 0, () -> format("fast-forward(%d) limit must be greater than zero", limit));

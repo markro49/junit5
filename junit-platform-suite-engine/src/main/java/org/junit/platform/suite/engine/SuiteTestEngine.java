@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2021 the original author or authors.
+ * Copyright 2015-2022 the original author or authors.
  *
  * All rights reserved. This program and the accompanying materials are
  * made available under the terms of the Eclipse Public License v2.0 which
@@ -26,9 +26,9 @@ import org.junit.platform.engine.UniqueId;
 /**
  * The JUnit Platform Suite {@link org.junit.platform.engine.TestEngine TestEngine}.
  *
- * @since 5.8
+ * @since 1.8
  */
-@API(status = INTERNAL, since = "5.8")
+@API(status = INTERNAL, since = "1.8")
 public final class SuiteTestEngine implements TestEngine {
 
 	@Override

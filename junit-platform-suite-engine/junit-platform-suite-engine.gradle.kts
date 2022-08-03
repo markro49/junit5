@@ -1,22 +1,18 @@
 plugins {
 	`java-library-conventions`
-	`testing-conventions`
-	`java-test-fixtures`
 }
 
 description = "JUnit Platform Suite Engine"
 
 dependencies {
-	api(platform(projects.bom))
-	api(libs.apiguardian)
-	api(projects.platform.engine)
-	api(projects.platform.suite.api)
+	api(platform(projects.junitBom))
+	api(projects.junitPlatformEngine)
+	api(projects.junitPlatformSuiteApi)
 
-	implementation(projects.platform.suite.commons)
+	compileOnlyApi(libs.apiguardian)
 
-	testFixturesApi(projects.jupiter.api)
-	testFixturesApi(projects.platform.suite.api)
+	implementation(projects.junitPlatformSuiteCommons)
 
-	testImplementation(projects.platform.testkit)
-	testImplementation(projects.jupiter.engine)
+	osgiVerification(projects.junitJupiterEngine)
+	osgiVerification(projects.junitPlatformLauncher)
 }

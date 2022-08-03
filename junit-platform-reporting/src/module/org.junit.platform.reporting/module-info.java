@@ -15,7 +15,7 @@
  */
 module org.junit.platform.reporting {
 	requires java.xml;
-	requires transitive org.apiguardian.api;
+	requires static transitive org.apiguardian.api;
 	requires org.junit.platform.commons;
 	requires transitive org.junit.platform.engine;
 	requires transitive org.junit.platform.launcher;
@@ -23,4 +23,8 @@ module org.junit.platform.reporting {
 	// exports org.junit.platform.reporting; empty package
 	exports org.junit.platform.reporting.legacy;
 	exports org.junit.platform.reporting.legacy.xml;
+	exports org.junit.platform.reporting.open.xml;
+
+	provides org.junit.platform.launcher.TestExecutionListener
+			with org.junit.platform.reporting.open.xml.OpenTestReportGeneratingListener;
 }

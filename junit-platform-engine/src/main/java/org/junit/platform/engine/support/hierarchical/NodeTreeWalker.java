@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2021 the original author or authors.
+ * Copyright 2015-2022 the original author or authors.
  *
  * All rights reserved. This program and the accompanying materials are
  * made available under the terms of the Eclipse Public License v2.0 which
@@ -74,15 +74,16 @@ class NodeTreeWalker {
 				forceDescendantExecutionModeRecursively(advisor, globalLockDescriptor);
 				advisor.useResourceLock(globalLockDescriptor, globalReadWriteLock);
 			}
+			if (globalLockDescriptor.equals(testDescriptor) && !allResources.contains(GLOBAL_READ_WRITE)) {
+				allResources.add(GLOBAL_READ);
+			}
 			advisor.useResourceLock(testDescriptor, lockManager.getLockForResources(allResources));
 		}
 	}
 
-	private void forceDescendantExecutionModeRecursively(NodeExecutionAdvisor advisor,
-			TestDescriptor globalLockDescriptor) {
-		advisor.forceDescendantExecutionMode(globalLockDescriptor, SAME_THREAD);
-		doForChildrenRecursively(globalLockDescriptor,
-			child -> advisor.forceDescendantExecutionMode(child, SAME_THREAD));
+	private void forceDescendantExecutionModeRecursively(NodeExecutionAdvisor advisor, TestDescriptor testDescriptor) {
+		advisor.forceDescendantExecutionMode(testDescriptor, SAME_THREAD);
+		doForChildrenRecursively(testDescriptor, child -> advisor.forceDescendantExecutionMode(child, SAME_THREAD));
 	}
 
 	private boolean isReadOnly(Set<ExclusiveResource> exclusiveResources) {

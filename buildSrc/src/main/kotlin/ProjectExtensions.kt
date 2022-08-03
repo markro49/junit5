@@ -1,12 +1,19 @@
 import org.gradle.api.Project
-import org.gradle.kotlin.dsl.extra
-import org.gradle.kotlin.dsl.provideDelegate
+import org.gradle.api.artifacts.VersionCatalog
+import org.gradle.api.artifacts.VersionCatalogsExtension
+import org.gradle.kotlin.dsl.the
 
 val Project.javaModuleName: String
     get() = "org." + this.name.replace('-', '.')
 
-val Project.projects: Projects
-    get() {
-        var versions: Projects? by rootProject.extra
-        return versions ?: Projects(rootProject).also { versions = it }
-    }
+fun Project.requiredVersionFromLibs(name: String) =
+    libsVersionCatalog.findVersion(name).get().requiredVersion
+
+fun Project.dependencyFromLibs(name: String) =
+    libsVersionCatalog.findLibrary(name).get()
+
+fun Project.bundleFromLibs(name: String) =
+    libsVersionCatalog.findBundle(name).get()
+
+private val Project.libsVersionCatalog: VersionCatalog
+    get() = the<VersionCatalogsExtension>().named("libs")

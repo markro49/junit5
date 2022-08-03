@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2021 the original author or authors.
+ * Copyright 2015-2022 the original author or authors.
  *
  * All rights reserved. This program and the accompanying materials are
  * made available under the terms of the Eclipse Public License v2.0 which
@@ -13,6 +13,9 @@ package org.junit.platform.suite.engine;
 import org.junit.platform.engine.UniqueId;
 import org.junit.platform.engine.support.descriptor.EngineDescriptor;
 
+/**
+ * @since 1.8
+ */
 final class SuiteEngineDescriptor extends EngineDescriptor {
 
 	static final String ENGINE_ID = "junit-platform-suite";

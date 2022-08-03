@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2021 the original author or authors.
+ * Copyright 2015-2022 the original author or authors.
  *
  * All rights reserved. This program and the accompanying materials are
  * made available under the terms of the Eclipse Public License v2.0 which
@@ -10,33 +10,39 @@
 
 package org.junit.platform.suite.commons;
 
-import static org.junit.platform.commons.support.AnnotationSupport.findAnnotation;
-import static org.junit.platform.commons.support.AnnotationSupport.findRepeatableAnnotations;
+import static org.junit.platform.commons.util.AnnotationUtils.findAnnotation;
+import static org.junit.platform.commons.util.AnnotationUtils.findRepeatableAnnotations;
 import static org.junit.platform.engine.discovery.ClassNameFilter.STANDARD_INCLUDE_PATTERN;
 import static org.junit.platform.suite.commons.AdditionalDiscoverySelectors.selectClasspathResource;
 import static org.junit.platform.suite.commons.AdditionalDiscoverySelectors.selectFile;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.AnnotatedElement;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
+import java.util.regex.Pattern;
+import java.util.stream.Stream;
 
 import org.apiguardian.api.API;
 import org.apiguardian.api.API.Status;
 import org.junit.platform.commons.util.Preconditions;
 import org.junit.platform.commons.util.StringUtils;
+import org.junit.platform.engine.ConfigurationParameters;
 import org.junit.platform.engine.DiscoverySelector;
 import org.junit.platform.engine.Filter;
 import org.junit.platform.engine.discovery.ClassNameFilter;
+import org.junit.platform.engine.discovery.ClassSelector;
 import org.junit.platform.engine.discovery.PackageNameFilter;
 import org.junit.platform.launcher.EngineFilter;
 import org.junit.platform.launcher.LauncherDiscoveryRequest;
 import org.junit.platform.launcher.TagFilter;
 import org.junit.platform.launcher.core.LauncherDiscoveryRequestBuilder;
 import org.junit.platform.suite.api.ConfigurationParameter;
+import org.junit.platform.suite.api.DisableParentConfigurationParameters;
 import org.junit.platform.suite.api.ExcludeClassNamePatterns;
 import org.junit.platform.suite.api.ExcludeEngines;
 import org.junit.platform.suite.api.ExcludePackages;
@@ -53,16 +59,21 @@ import org.junit.platform.suite.api.SelectModules;
 import org.junit.platform.suite.api.SelectPackages;
 import org.junit.platform.suite.api.SelectUris;
 
+/**
+ * @since 1.8
+ */
 @API(status = Status.INTERNAL, since = "1.8", consumers = { "org.junit.platform.suite.engine",
 		"org.junit.platform.runner" })
 public final class SuiteLauncherDiscoveryRequestBuilder {
 
 	private final LauncherDiscoveryRequestBuilder delegate = LauncherDiscoveryRequestBuilder.request();
+	private final List<String> selectedClassNames = new ArrayList<>();
 	private boolean includeClassNamePatternsUsed;
 	private boolean filterStandardClassNamePatterns = false;
+	private ConfigurationParameters parentConfigurationParameters;
+	private boolean enableParentConfigurationParameters = true;
 
 	private SuiteLauncherDiscoveryRequestBuilder() {
-
 	}
 
 	public static SuiteLauncherDiscoveryRequestBuilder request() {
@@ -75,83 +86,103 @@ public final class SuiteLauncherDiscoveryRequestBuilder {
 		return this;
 	}
 
-	public LauncherDiscoveryRequestBuilder selectors(DiscoverySelector... selectors) {
-		return delegate.selectors(selectors);
+	public SuiteLauncherDiscoveryRequestBuilder selectors(DiscoverySelector... selectors) {
+		delegate.selectors(selectors);
+		return this;
 	}
 
-	public LauncherDiscoveryRequestBuilder selectors(List<? extends DiscoverySelector> selectors) {
-		return delegate.selectors(selectors);
+	public SuiteLauncherDiscoveryRequestBuilder selectors(List<? extends DiscoverySelector> selectors) {
+		delegate.selectors(selectors);
+		return this;
 	}
 
-	public LauncherDiscoveryRequestBuilder filters(Filter<?>... filters) {
-		return delegate.filters(filters);
+	public SuiteLauncherDiscoveryRequestBuilder filters(Filter<?>... filters) {
+		delegate.filters(filters);
+		return this;
 	}
 
-	public LauncherDiscoveryRequestBuilder configurationParameter(String key, String value) {
-		return delegate.configurationParameter(key, value);
+	public SuiteLauncherDiscoveryRequestBuilder configurationParameter(String key, String value) {
+		delegate.configurationParameter(key, value);
+		return this;
 	}
 
-	public LauncherDiscoveryRequestBuilder configurationParameters(Map<String, String> configurationParameters) {
-		return delegate.configurationParameters(configurationParameters);
+	public SuiteLauncherDiscoveryRequestBuilder configurationParameters(Map<String, String> configurationParameters) {
+		delegate.configurationParameters(configurationParameters);
+		return this;
 	}
 
-	public SuiteLauncherDiscoveryRequestBuilder suite(AnnotatedElement suite) {
-		Preconditions.notNull(suite, "Test class must not be null");
+	public SuiteLauncherDiscoveryRequestBuilder parentConfigurationParameters(
+			ConfigurationParameters parentConfigurationParameters) {
+		this.parentConfigurationParameters = parentConfigurationParameters;
+		return this;
+	}
 
-		// Annotations in alphabetical order
+	public SuiteLauncherDiscoveryRequestBuilder enableImplicitConfigurationParameters(boolean enabled) {
+		delegate.enableImplicitConfigurationParameters(enabled);
+		return this;
+	}
+
+	public SuiteLauncherDiscoveryRequestBuilder suite(Class<?> suiteClass) {
+		Preconditions.notNull(suiteClass, "Suite class must not be null");
+
+		// Annotations in alphabetical order (except @SelectClasses)
 		// @formatter:off
-		findRepeatableAnnotations(suite, ConfigurationParameter.class)
+		findRepeatableAnnotations(suiteClass, ConfigurationParameter.class)
 				.forEach(configuration -> configurationParameter(configuration.key(), configuration.value()));
-		findAnnotationValues(suite, ExcludeClassNamePatterns.class, ExcludeClassNamePatterns::value)
+		findAnnotation(suiteClass, DisableParentConfigurationParameters.class)
+				.ifPresent(__ -> enableParentConfigurationParameters = false);
+		findAnnotationValues(suiteClass, ExcludeClassNamePatterns.class, ExcludeClassNamePatterns::value)
 				.flatMap(SuiteLauncherDiscoveryRequestBuilder::trimmed)
 				.map(ClassNameFilter::excludeClassNamePatterns)
 				.ifPresent(this::filters);
-		findAnnotationValues(suite, ExcludeEngines.class, ExcludeEngines::value)
+		findAnnotationValues(suiteClass, ExcludeEngines.class, ExcludeEngines::value)
 				.map(EngineFilter::excludeEngines)
 				.ifPresent(this::filters);
-		findAnnotationValues(suite, ExcludePackages.class, ExcludePackages::value)
+		findAnnotationValues(suiteClass, ExcludePackages.class, ExcludePackages::value)
 				.map(PackageNameFilter::excludePackageNames)
 				.ifPresent(this::filters);
-		findAnnotationValues(suite, ExcludeTags.class, ExcludeTags::value)
+		findAnnotationValues(suiteClass, ExcludeTags.class, ExcludeTags::value)
 				.map(TagFilter::excludeTags)
 				.ifPresent(this::filters);
-		findAnnotationValues(suite, IncludeClassNamePatterns.class, IncludeClassNamePatterns::value)
+		// Process @SelectClasses before @IncludeClassNamePatterns, since the names
+		// of selected classes get automatically added to the include filter.
+		findAnnotationValues(suiteClass, SelectClasses.class, SelectClasses::value)
+				.map(this::selectClasses)
+				.ifPresent(this::selectors);
+		findAnnotationValues(suiteClass, IncludeClassNamePatterns.class, IncludeClassNamePatterns::value)
 				.flatMap(SuiteLauncherDiscoveryRequestBuilder::trimmed)
-				.map(ClassNameFilter::includeClassNamePatterns)
-				.ifPresent(filters ->{
+				.map(this::createIncludeClassNameFilter)
+				.ifPresent(filters -> {
 					includeClassNamePatternsUsed = true;
-					this.filters(filters);
+					filters(filters);
 				});
-		findAnnotationValues(suite, IncludeEngines.class, IncludeEngines::value)
+		findAnnotationValues(suiteClass, IncludeEngines.class, IncludeEngines::value)
 				.map(EngineFilter::includeEngines)
 				.ifPresent(this::filters);
-		findAnnotationValues(suite, IncludePackages.class, IncludePackages::value)
+		findAnnotationValues(suiteClass, IncludePackages.class, IncludePackages::value)
 				.map(PackageNameFilter::includePackageNames)
 				.ifPresent(this::filters);
-		findAnnotationValues(suite, IncludeTags.class, IncludeTags::value)
+		findAnnotationValues(suiteClass, IncludeTags.class, IncludeTags::value)
 				.map(TagFilter::includeTags)
 				.ifPresent(this::filters);
-		findAnnotationValues(suite, SelectClasses.class, SelectClasses::value)
-				.map(AdditionalDiscoverySelectors::selectClasses)
-				.ifPresent(this::selectors);
-		findRepeatableAnnotations(suite, SelectClasspathResource.class)
+		findRepeatableAnnotations(suiteClass, SelectClasspathResource.class)
 				.stream()
 				.map(annotation -> selectClasspathResource(annotation.value(), annotation.line(), annotation.column()))
 				.forEach(this::selectors);
-		findAnnotationValues(suite, SelectDirectories.class, SelectDirectories::value)
+		findAnnotationValues(suiteClass, SelectDirectories.class, SelectDirectories::value)
 				.map(AdditionalDiscoverySelectors::selectDirectories)
 				.ifPresent(this::selectors);
-		findRepeatableAnnotations(suite, SelectFile.class)
+		findRepeatableAnnotations(suiteClass, SelectFile.class)
 				.stream()
 				.map(annotation -> selectFile(annotation.value(), annotation.line(), annotation.column()))
 				.forEach(this::selectors);
-		findAnnotationValues(suite, SelectModules.class, SelectModules::value)
+		findAnnotationValues(suiteClass, SelectModules.class, SelectModules::value)
 				.map(AdditionalDiscoverySelectors::selectModules)
 				.ifPresent(this::selectors);
-		findAnnotationValues(suite, SelectUris.class, SelectUris::value)
+		findAnnotationValues(suiteClass, SelectUris.class, SelectUris::value)
 				.map(AdditionalDiscoverySelectors::selectUris)
 				.ifPresent(this::selectors);
-		findAnnotationValues(suite, SelectPackages.class, SelectPackages::value)
+		findAnnotationValues(suiteClass, SelectPackages.class, SelectPackages::value)
 				.map(AdditionalDiscoverySelectors::selectPackages)
 				.ifPresent(this::selectors);
 		// @formatter:on
@@ -160,9 +191,27 @@ public final class SuiteLauncherDiscoveryRequestBuilder {
 
 	public LauncherDiscoveryRequest build() {
 		if (filterStandardClassNamePatterns && !includeClassNamePatternsUsed) {
-			delegate.filters(ClassNameFilter.includeClassNamePatterns(STANDARD_INCLUDE_PATTERN));
+			delegate.filters(createIncludeClassNameFilter(STANDARD_INCLUDE_PATTERN));
 		}
+
+		if (enableParentConfigurationParameters && parentConfigurationParameters != null) {
+			delegate.parentConfigurationParameters(parentConfigurationParameters);
+		}
+
 		return delegate.build();
+	}
+
+	private List<ClassSelector> selectClasses(Class<?>... classes) {
+		Arrays.stream(classes).map(Class::getName).distinct().forEach(this.selectedClassNames::add);
+		return AdditionalDiscoverySelectors.selectClasses(classes);
+	}
+
+	private ClassNameFilter createIncludeClassNameFilter(String... patterns) {
+		String[] combinedPatterns = Stream.concat(//
+			this.selectedClassNames.stream().map(Pattern::quote), //
+			Arrays.stream(patterns)//
+		).toArray(String[]::new);
+		return ClassNameFilter.includeClassNamePatterns(combinedPatterns);
 	}
 
 	private static <A extends Annotation, V> Optional<V[]> findAnnotationValues(AnnotatedElement element,

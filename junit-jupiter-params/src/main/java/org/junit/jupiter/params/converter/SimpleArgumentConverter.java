@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2021 the original author or authors.
+ * Copyright 2015-2022 the original author or authors.
  *
  * All rights reserved. This program and the accompanying materials are
  * made available under the terms of the Eclipse Public License v2.0 which
@@ -16,11 +16,14 @@ import org.apiguardian.api.API;
 import org.junit.jupiter.api.extension.ParameterContext;
 
 /**
- * {@code SimpleArgumentConverter} is an abstract base class for {@link ArgumentConverter}
- * implementations.
+ * {@code SimpleArgumentConverter} is an abstract base class for
+ * {@link ArgumentConverter} implementations that only need to know the target
+ * type and do not need access to the {@link ParameterContext} to perform the
+ * conversion.
  *
  * @since 5.0
  * @see ArgumentConverter
+ * @see TypedArgumentConverter
  */
 @API(status = STABLE, since = "5.7")
 public abstract class SimpleArgumentConverter implements ArgumentConverter {

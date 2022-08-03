@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2021 the original author or authors.
+ * Copyright 2015-2022 the original author or authors.
  *
  * All rights reserved. This program and the accompanying materials are
  * made available under the terms of the Eclipse Public License v2.0 which
@@ -11,15 +11,23 @@
 package org.junit.jupiter.params;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.within;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
+import static org.junit.jupiter.api.Named.named;
+import static org.junit.jupiter.engine.discovery.JupiterUniqueIdBuilder.appendTestTemplateInvocationSegment;
+import static org.junit.jupiter.engine.discovery.JupiterUniqueIdBuilder.uniqueIdForTestTemplateMethod;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
 import static org.junit.platform.engine.discovery.DiscoverySelectors.selectClass;
+import static org.junit.platform.engine.discovery.DiscoverySelectors.selectIteration;
 import static org.junit.platform.engine.discovery.DiscoverySelectors.selectMethod;
+import static org.junit.platform.engine.discovery.DiscoverySelectors.selectUniqueId;
 import static org.junit.platform.testkit.engine.EventConditions.abortedWithReason;
 import static org.junit.platform.testkit.engine.EventConditions.container;
 import static org.junit.platform.testkit.engine.EventConditions.displayName;
 import static org.junit.platform.testkit.engine.EventConditions.event;
+import static org.junit.platform.testkit.engine.EventConditions.finishedSuccessfully;
 import static org.junit.platform.testkit.engine.EventConditions.finishedWithFailure;
 import static org.junit.platform.testkit.engine.EventConditions.started;
 import static org.junit.platform.testkit.engine.EventConditions.test;
@@ -86,6 +94,88 @@ import org.opentest4j.TestAbortedException;
  * @since 5.0
  */
 class ParameterizedTestIntegrationTests {
+
+	@ParameterizedTest
+	@CsvSource(quoteCharacter = '"', textBlock = """
+
+
+			# This is a comment preceded by multiple opening blank lines.
+			apple,         1
+			banana,        2
+			# This is a comment pointing out that the next line contains multiple explicit newlines in quoted text.
+			"lemon  \s
+
+
+			\s  lime",         0xF1
+			# The next line is a blank line in the middle of the CSV rows.
+
+			strawberry,    700_000
+			# This is a comment followed by 2 closing blank line.
+
+			""")
+	void executesLinesFromTextBlock(String fruit, int rank) {
+		switch (fruit) {
+			case "apple" -> assertThat(rank).isEqualTo(1);
+			case "banana" -> assertThat(rank).isEqualTo(2);
+			case "lemon   \n\n\n   lime" -> assertThat(rank).isEqualTo(241);
+			case "strawberry" -> assertThat(rank).isEqualTo(700_000);
+			default -> fail("Unexpected fruit : " + fruit);
+		}
+	}
+
+	@ParameterizedTest(name = "[{index}] {arguments}")
+	@CsvSource(delimiter = '|', useHeadersInDisplayName = true, nullValues = "NIL", textBlock = """
+			#---------------------------------
+			  FRUIT  | RANK
+			#---------------------------------
+			  apple  | 1
+			#---------------------------------
+			  banana | 2
+			#---------------------------------
+			  cherry | 3.14159265358979323846
+			#---------------------------------
+			         | 0
+			#---------------------------------
+			  NIL    | 0
+			#---------------------------------
+			""")
+	void executesLinesFromTextBlockUsingTableFormatAndHeadersAndNullValues(String fruit, double rank,
+			TestInfo testInfo) {
+		assertFruitTable(fruit, rank, testInfo);
+	}
+
+	@ParameterizedTest(name = "[{index}] {arguments}")
+	@CsvFileSource(resources = "two-column-with-headers.csv", delimiter = '|', useHeadersInDisplayName = true, nullValues = "NIL")
+	void executesLinesFromClasspathResourceUsingTableFormatAndHeadersAndNullValues(String fruit, double rank,
+			TestInfo testInfo) {
+		assertFruitTable(fruit, rank, testInfo);
+	}
+
+	private void assertFruitTable(String fruit, double rank, TestInfo testInfo) {
+		String displayName = testInfo.getDisplayName();
+
+		if (fruit == null) {
+			assertThat(rank).isEqualTo(0);
+			assertThat(displayName).matches("\\[(4|5)\\] FRUIT = null, RANK = 0");
+			return;
+		}
+
+		switch (fruit) {
+			case "apple" -> {
+				assertThat(rank).isEqualTo(1);
+				assertThat(displayName).isEqualTo("[1] FRUIT = apple, RANK = 1");
+			}
+			case "banana" -> {
+				assertThat(rank).isEqualTo(2);
+				assertThat(displayName).isEqualTo("[2] FRUIT = banana, RANK = 2");
+			}
+			case "cherry" -> {
+				assertThat(rank).isCloseTo(Math.PI, within(0.0));
+				assertThat(displayName).isEqualTo("[3] FRUIT = cherry, RANK = 3.14159265358979323846");
+			}
+			default -> fail("Unexpected fruit : " + fruit);
+		}
+	}
 
 	@Test
 	void executesWithSingleArgumentsProviderWithMultipleInvocations() {
@@ -646,6 +736,15 @@ class ParameterizedTestIntegrationTests {
 						event(test(), displayName("default name"), finishedWithFailure(message("default name"))));
 		}
 
+		@Test
+		void nameParametersAlias() {
+			execute("namedParametersAlias", String.class).allEvents().assertThatEvents() //
+					.haveAtLeast(1,
+						event(test(), displayName("cool name"), finishedWithFailure(message("parameter value")))) //
+					.haveAtLeast(1,
+						event(test(), displayName("default name"), finishedWithFailure(message("default name"))));
+		}
+
 	}
 
 	@Nested
@@ -692,6 +791,27 @@ class ParameterizedTestIntegrationTests {
 				methodParameterTypes);
 		}
 
+	}
+
+	@Test
+	void closeAutoCloseableArgumentsAfterTest() {
+		var results = execute("testWithAutoCloseableArgument", AutoCloseableArgument.class);
+		results.allEvents().assertThatEvents() //
+				.haveExactly(1, event(test(), finishedSuccessfully()));
+
+		assertTrue(AutoCloseableArgument.isClosed);
+	}
+
+	@Test
+	void executesTwoIterationsBasedOnIterationAndUniqueIdSelector() {
+		var methodId = uniqueIdForTestTemplateMethod(TestCase.class, "testWithThreeIterations(int)");
+		var results = execute(selectUniqueId(appendTestTemplateInvocationSegment(methodId, 3)),
+			selectIteration(selectMethod(TestCase.class, "testWithThreeIterations", "int"), 1));
+
+		results.allEvents().assertThatEvents() //
+				.haveExactly(2, event(test(), finishedWithFailure())) //
+				.haveExactly(1, event(test(), displayName("[2] argument=3"), finishedWithFailure())) //
+				.haveExactly(1, event(test(), displayName("[3] argument=5"), finishedWithFailure()));
 	}
 
 	// -------------------------------------------------------------------------
@@ -776,6 +896,17 @@ class ParameterizedTestIntegrationTests {
 			fail("arguments: '" + argument1 + "', '" + argument2 + "'");
 		}
 
+		@ParameterizedTest
+		@ArgumentsSource(AutoCloseableArgumentProvider.class)
+		void testWithAutoCloseableArgument(AutoCloseableArgument autoCloseable) {
+			assertFalse(AutoCloseableArgument.isClosed);
+		}
+
+		@ParameterizedTest
+		@ValueSource(ints = { 2, 3, 5 })
+		void testWithThreeIterations(int argument) {
+			fail("argument: " + argument);
+		}
 	}
 
 	static class NullSourceTestCase {
@@ -1036,6 +1167,12 @@ class ParameterizedTestIntegrationTests {
 			fail(string);
 		}
 
+		@MethodSourceTest
+		@Order(14)
+		void namedParametersAlias(String string) {
+			fail(string);
+		}
+
 		// ---------------------------------------------------------------------
 
 		static Stream<Arguments> emptyMethodSource() {
@@ -1095,6 +1232,10 @@ class ParameterizedTestIntegrationTests {
 
 		static Stream<Arguments> namedParameters() {
 			return Stream.of(arguments(Named.of("cool name", "parameter value")), arguments("default name"));
+		}
+
+		static Stream<Arguments> namedParametersAlias() {
+			return Stream.of(arguments(named("cool name", "parameter value")), arguments("default name"));
 		}
 
 		// ---------------------------------------------------------------------
@@ -1235,6 +1376,24 @@ class ParameterizedTestIntegrationTests {
 		@Override
 		public Object convert(Object source, ParameterContext context) throws ArgumentConversionException {
 			throw new ArgumentConversionException("something went horribly wrong");
+		}
+	}
+
+	private static class AutoCloseableArgumentProvider implements ArgumentsProvider {
+
+		@Override
+		public Stream<? extends Arguments> provideArguments(ExtensionContext context) {
+			return Stream.of(arguments(new AutoCloseableArgument()));
+		}
+	}
+
+	static class AutoCloseableArgument implements AutoCloseable {
+
+		static boolean isClosed = false;
+
+		@Override
+		public void close() {
+			isClosed = true;
 		}
 	}
 

@@ -1,23 +1,26 @@
-import aQute.bnd.gradle.BundleTaskConvention
-import aQute.bnd.gradle.FileSetRepositoryConvention
+import aQute.bnd.gradle.BundleTaskExtension
 import aQute.bnd.gradle.Resolve
 
 plugins {
 	`java-library`
 }
 
+val importAPIGuardian = "org.apiguardian.*;resolution:=\"optional\""
+
 // This task enhances `jar` and `shadowJar` tasks with the bnd
-// `BundleTaskConvention` convention which allows for generating OSGi
+// `BundleTaskExtension` extension which allows for generating OSGi
 // metadata into the jar
 tasks.withType<Jar>().matching {
 	task: Jar -> task.name == "jar" || task.name == "shadowJar"
 }.configureEach {
-	val btc = BundleTaskConvention(this)
+	val bte = extensions.create<BundleTaskExtension>(BundleTaskExtension.NAME, this)
+
+	extra["importAPIGuardian"] = importAPIGuardian
 
 	// These are bnd instructions necessary for generating OSGi metadata.
 	// We've generalized these so that they are widely applicable limiting
 	// module configurations to special cases.
-	btc.setBnd("""
+	bte.setBnd("""
 			# Set the Bundle-SymbolicName to the archiveBaseName.
 			# We don't use the archiveClassifier which Bnd will use
 			# in the default Bundle-SymbolicName value.
@@ -28,14 +31,15 @@ tasks.withType<Jar>().matching {
 
 			# These are the general rules for package imports.
 			Import-Package: \
-				!org.apiguardian.api,\
+				${importAPIGuardian},\
 				org.junit.platform.commons.logging;status=INTERNAL,\
 				kotlin.*;resolution:="optional",\
 				*
 
 			# This tells bnd not to complain if a module doesn't actually import
-			# the kotlin packages, but enough modules do to make it a default.
+			# the kotlin and apiguardian packages, but enough modules do to make it a default.
 			-fixupmessages.kotlin.import: "Unused Import-Package instructions: \\[kotlin.*\\]";is:=ignore
+			-fixupmessages.apiguardian.import: "Unused Import-Package instructions: \\[org.apiguardian.*\\]";is:=ignore
 
 			# This tells bnd to ignore classes it finds in `META-INF/versions/`
 			# because bnd doesn't yet support multi-release jars.
@@ -58,28 +62,24 @@ tasks.withType<Jar>().matching {
 			-export-apiguardian: *;version=${'$'}{versionmask;===;${'$'}{version_cleanup;${'$'}{task.archiveVersion}}}
 		""")
 
-	// Add the convention to the jar task
-	convention.plugins["bundle"] = btc
-
-	doLast {
-		// Do the actual work putting OSGi stuff in the jar.
-		btc.buildBundle()
-	}
+	// Do the actual work putting OSGi stuff in the jar.
+	doLast(bte.buildAction())
 }
-
-val osgiPropertiesFile = file("$buildDir/verifyOSGiProperties.bndrun")
 
 // Bnd's Resolve task uses a properties file for its configuration. This
 // task writes out the properties necessary for it to verify the OSGi
 // metadata.
 val osgiProperties by tasks.registering(WriteProperties::class) {
-	outputFile = osgiPropertiesFile
+	setOutputFile(layout.buildDirectory.file("verifyOSGiProperties.bndrun"))
 	property("-standalone", true)
 	project.extensions.getByType(JavaLibraryExtension::class.java).let { javaLibrary ->
 		property("-runee", "JavaSE-${javaLibrary.mainJavaVersion}")
 	}
 	property("-runrequires", "osgi.identity;filter:='(osgi.identity=${project.name})'")
-	property("-runsystempackages", "jdk.internal.misc,sun.misc")
+	property("-runsystempackages", "jdk.internal.misc,jdk.jfr,sun.misc")
+	// API Guardian should be optional -> instruct resolver to ignore it
+	// during resolution. Resolve should still pass.
+	property("-runblacklist", "org.apiguardian.api")
 }
 
 val osgiVerification by configurations.creating {
@@ -90,20 +90,17 @@ val osgiVerification by configurations.creating {
 // that its metadata is valid. If the metadata is invalid this task will
 // fail.
 val verifyOSGi by tasks.registering(Resolve::class) {
-	dependsOn(osgiProperties)
-	setBndrun(osgiPropertiesFile)
+	bndrun.fileProvider(osgiProperties.map{ it.outputFile })
+	outputBndrun.set(layout.buildDirectory.file("resolvedOSGiProperties.bndrun"))
 	isReportOptional = false
-	withConvention(FileSetRepositoryConvention::class) {
-
-		// By default bnd will use jars found in:
-		// 1. project.sourceSets.main.runtimeClasspath
-		// 2. project.configurations.archives.artifacts.files
-		// to validate the metadata.
-		// This adds jars defined in `osgiVerification` also so that bnd
-		// can use them to validate the metadata without causing those to
-		// end up in the dependencies of those projects.
-		bundles(osgiVerification)
-	}
+	// By default bnd will use jars found in:
+	// 1. project.sourceSets.main.runtimeClasspath
+	// 2. project.configurations.archives.artifacts.files
+	// to validate the metadata.
+	// This adds jars defined in `osgiVerification` also so that bnd
+	// can use them to validate the metadata without causing those to
+	// end up in the dependencies of those projects.
+	bundles(osgiVerification)
 }
 
 tasks.check {

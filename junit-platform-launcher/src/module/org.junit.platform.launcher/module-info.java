@@ -21,7 +21,7 @@
  */
 module org.junit.platform.launcher {
 	requires transitive java.logging;
-	requires transitive org.apiguardian.api;
+	requires static transitive org.apiguardian.api;
 	requires transitive org.junit.platform.commons;
 	requires transitive org.junit.platform.engine;
 
@@ -35,4 +35,7 @@ module org.junit.platform.launcher {
 	uses org.junit.platform.launcher.LauncherSessionListener;
 	uses org.junit.platform.launcher.PostDiscoveryFilter;
 	uses org.junit.platform.launcher.TestExecutionListener;
+
+	provides org.junit.platform.launcher.TestExecutionListener
+			with org.junit.platform.launcher.listeners.UniqueIdTrackingListener;
 }

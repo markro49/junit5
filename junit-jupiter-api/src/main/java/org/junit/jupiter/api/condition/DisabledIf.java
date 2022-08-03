@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2021 the original author or authors.
+ * Copyright 2015-2022 the original author or authors.
  *
  * All rights reserved. This program and the accompanying materials are
  * made available under the terms of the Eclipse Public License v2.0 which
@@ -22,12 +22,12 @@ import org.apiguardian.api.API;
 import org.junit.jupiter.api.extension.ExtendWith;
 
 /**
- * {@code @DisabledIf} is used to signal that the annotated test class or
- * test method is <em>disabled</em> only if the provided condition
- * evaluates to {@code true}.
+ * {@code @DisabledIf} is used to signal that the annotated test class or test
+ * method is <em>disabled</em> only if the provided
+ * {@linkplain #value() condition} evaluates to {@code true}.
  *
- * <p>When applied at the class level, all test methods within that class
- * will be disabled on the same condition.
+ * <p>When applied at the class level, all test methods within that class will
+ * be disabled on the same condition.
  *
  * <p>If a test method is disabled via this annotation, that does not prevent
  * the test class from being instantiated. Rather, it prevents the execution of
@@ -38,7 +38,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
  * custom <em>composed annotation</em> that inherits the semantics of this
  * annotation.
  *
- * <h4>Warning</h4>
+ * <h2>Warning</h2>
  *
  * This annotation can only be declared once on an
  * {@link java.lang.reflect.AnnotatedElement AnnotatedElement} (i.e., test
@@ -71,20 +71,24 @@ import org.junit.jupiter.api.extension.ExtendWith;
 public @interface DisabledIf {
 
 	/**
-	 * The name of a method within the test class or in external classes
-	 * to use as a condition for the container's execution.
+	 * The name of a method within the test class or in an external class to use
+	 * as a condition for the test's or container's execution.
 	 *
-	 * <p>Condition methods must be static if located outside the test class,
-	 * or if {@code @DisabledIf} is used at class level.
+	 * <p>Condition methods must be static if located outside the test class or
+	 * if {@code @DisabledIf} is used at the class level.
 	 *
-	 * <p>Condition methods in external classes must be referenced by <em>fully
-	 * qualified method name</em> &mdash; for example,
+	 * <p>A condition method in an external class must be referenced by its
+	 * <em>fully qualified method name</em> &mdash; for example,
 	 * {@code com.example.Conditions#isEncryptionSupported}.
 	 */
 	String value();
 
 	/**
-	 * Reason to provide if the test of container ends up being disabled.
+	 * Custom reason to provide if the test or container is disabled.
+	 *
+	 * <p>If a custom reason is supplied, it will be combined with the default
+	 * reason for this annotation. If a custom reason is not supplied, the default
+	 * reason will be used.
 	 */
 	String disabledReason() default "";
 

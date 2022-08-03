@@ -21,27 +21,32 @@ Java's <<extensions-registration-automatic,`ServiceLoader`>> mechanism.
 
 Developers can register one or more extensions _declaratively_ by annotating a test
 interface, test class, test method, or custom _<<writing-tests-meta-annotations,composed
-annotation>>_ with `@ExtendWith(...)` and supplying class references for the extensions
-to register.
+annotation>>_ with `@ExtendWith(...)` and supplying class references for the extensions to
+register. As of JUnit Jupiter 5.8, `@ExtendWith` may also be declared on fields or on
+parameters in test class constructors, in test methods, and in `@BeforeAll`, `@AfterAll`,
+`@BeforeEach`, and `@AfterEach` lifecycle methods.
 
-For example, to register a custom `RandomParametersExtension` for a particular test
-method, you would annotate the test method as follows.
+For example, to register a `WebServerExtension` for a particular test method, you would
+annotate the test method as follows. We assume the `WebServerExtension` starts a local web
+server and injects the server's URL into parameters annotated with `@WebServerUrl`.
 
 [source,java,indent=0]
 ----
-@ExtendWith(RandomParametersExtension.class)
 @Test
-void test(@Random int i) {
-	// ...
+@ExtendWith(WebServerExtension.class)
+void getProductList(@WebServerUrl String serverUrl) {
+	WebClient webClient = new WebClient();
+	// Use WebClient to connect to web server using serverUrl and verify response
+	assertEquals(200, webClient.get(serverUrl + "/products").getResponseStatus());
 }
 ----
 
-To register a custom `RandomParametersExtension` for all tests in a particular class and
-its subclasses, you would annotate the test class as follows.
+To register the `WebServerExtension` for all tests in a particular class and its
+subclasses, you would annotate the test class as follows.
 
 [source,java,indent=0]
 ----
-@ExtendWith(RandomParametersExtension.class)
+@ExtendWith(WebServerExtension.class)
 class MyTests {
 	// ...
 }
@@ -71,15 +76,16 @@ class MySecondTests {
 [TIP]
 .Extension Registration Order
 ====
-Extensions registered declaratively via `@ExtendWith` will be executed in the order in
-which they are declared in the source code. For example, the execution of tests in both
-`MyFirstTests` and `MySecondTests` will be extended by the `DatabaseExtension` and
-`WebServerExtension`, **in exactly that order**.
+Extensions registered declaratively via `@ExtendWith` at the class level, method level, or
+parameter level will be executed in the order in which they are declared in the source
+code. For example, the execution of tests in both `MyFirstTests` and `MySecondTests` will
+be extended by the `DatabaseExtension` and `WebServerExtension`, **in exactly that order**.
 ====
 
 If you wish to combine multiple extensions in a reusable way, you can define a custom
 _<<writing-tests-meta-annotations,composed annotation>>_ and use `@ExtendWith` as a
-_meta-annotation_:
+_meta-annotation_ as in the following code listing. Then `@DatabaseAndWebServerExtension`
+can be used in place of `@ExtendWith({ DatabaseExtension.class, WebServerExtension.class })`.
 
 [source,java,indent=0]
 ----
@@ -89,6 +95,40 @@ _meta-annotation_:
 public @interface DatabaseAndWebServerExtension {
 }
 ----
+
+The above examples demonstrate how `@ExtendWith` can be applied at the class level or at
+the method level; however, for certain use cases it makes sense for an extension to be
+registered declaratively at the field or parameter level. Consider a
+`RandomNumberExtension` that generates random numbers that can be injected into a field or
+via a parameter in a constructor, test method, or lifecycle method. If the extension
+provides a `@Random` annotation that is meta-annotated with
+`@ExtendWith(RandomNumberExtension.class)` (see listing below), the extension can be used
+transparently as in the following `RandomNumberDemo` example.
+
+[source,java,indent=0]
+----
+include::{testDir}/example/extensions/Random.java[tags=user_guide]
+----
+
+[source,java,indent=0]
+----
+include::{testDir}/example/extensions/RandomNumberDemo.java[tags=user_guide]
+----
+
+[TIP]
+.Extension Registration Order for `@ExtendWith` on Fields
+====
+Extensions registered declaratively via `@ExtendWith` on fields will be ordered relative
+to `@RegisterExtension` fields and other `@ExtendWith` fields using an algorithm that is
+deterministic but intentionally nonobvious. However, `@ExtendWith` fields can be ordered
+using the `@Order` annotation. See the <<extensions-registration-programmatic-order,
+Extension Registration Order>> tip for `@RegisterExtension` fields for details.
+====
+
+NOTE: `@ExtendWith` fields may be either `static` or non-static. The documentation on
+<<extensions-registration-programmatic-static-fields, Static Fields>> and
+<<extensions-registration-programmatic-instance-fields, Instance Fields>> for
+`@RegisterExtension` fields also applies to `@ExtendWith` fields.
 
 [[extensions-registration-programmatic]]
 ==== Programmatic Extension Registration
@@ -106,27 +146,27 @@ extension's constructor, a static factory method, or a builder API.
 [TIP]
 .Extension Registration Order
 ====
-By default, extensions registered programmatically via `@RegisterExtension` will be
-ordered using an algorithm that is deterministic but intentionally nonobvious. This
-ensures that subsequent runs of a test suite execute extensions in the same order, thereby
-allowing for repeatable builds. However, there are times when extensions need to be
-registered in an explicit order. To achieve that, annotate `@RegisterExtension` fields
-with `{Order}`.
+By default, extensions registered programmatically via `@RegisterExtension` or
+declaratively via `@ExtendWith` on fields will be ordered using an algorithm that is
+deterministic but intentionally nonobvious. This ensures that subsequent runs of a test
+suite execute extensions in the same order, thereby allowing for repeatable builds.
+However, there are times when extensions need to be registered in an explicit order. To
+achieve that, annotate `@RegisterExtension` fields or `@ExtendWith` fields with `{Order}`.
 
-Any `@RegisterExtension` field not annotated with `@Order` will be ordered using the
-_default_ order which has a value of `Integer.MAX_VALUE / 2`. This allows `@Order`
-annotated extension fields to be explicitly ordered before or after non-annotated
-extension fields. Extensions with an explicit order value less than the default order
-value will be registered before non-annotated extensions. Similarly, extensions with an
-explicit order value greater than the default order value will be registered after
-non-annotated extensions. For example, assigning an extension an explicit order value that
-is greater than the default order value allows _before_ callback extensions to be
-registered last and _after_ callback extensions to be registered first, relative to other
-programmatically registered extensions.
+Any `@RegisterExtension` field or `@ExtendWith` field not annotated with `@Order` will be
+ordered using the _default_ order which has a value of `Integer.MAX_VALUE / 2`. This
+allows `@Order` annotated extension fields to be explicitly ordered before or after
+non-annotated extension fields. Extensions with an explicit order value less than the
+default order value will be registered before non-annotated extensions. Similarly,
+extensions with an explicit order value greater than the default order value will be
+registered after non-annotated extensions. For example, assigning an extension an explicit
+order value that is greater than the default order value allows _before_ callback
+extensions to be registered last and _after_ callback extensions to be registered first,
+relative to other programmatically registered extensions.
 ====
 
-NOTE: `@RegisterExtension` fields must not be `private` or `null` (at evaluation time) but
-may be either `static` or non-static.
+NOTE: `@RegisterExtension` fields must not be `null` (at evaluation time) but may be
+either `static` or non-static.
 
 [[extensions-registration-programmatic-static-fields]]
 ===== Static Fields
@@ -149,19 +189,18 @@ lifecycle methods annotated with `@BeforeAll` or `@AfterAll` as well as `@Before
 `server` field if necessary.
 
 [source,java,indent=0]
-.An extension registered via a static field
+.Registering an extension via a static field in Java
 ----
 include::{testDir}/example/registration/WebServerDemo.java[tags=user_guide]
 ----
 
 [[extensions-registration-programmatic-static-fields-kotlin]]
-===== Static Fields in Kotlin
+====== Static Fields in Kotlin
 
 The Kotlin programming language does not have the concept of a `static` field. However,
-the compiler can be instructed to generate static fields using annotations. Since, as
-stated earlier, `@RegisterExtension` fields must not be `private` nor `null`, one
-**cannot** use the `@JvmStatic` annotation in Kotlin as it generates `private` fields.
-Rather, the `@JvmField` annotation must be used.
+the compiler can be instructed to generate a `private static` field using the `@JvmStatic`
+annotation in Kotlin. If you want the Kotlin compiler to generate a `public static` field,
+you can use the `@JvmField` annotation instead.
 
 The following example is a version of the `WebServerDemo` from the previous section that
 has been ported to Kotlin.
@@ -282,6 +321,17 @@ following system property.
 
 Refer to <<running-tests-config-params-deactivation-pattern>> for details.
 
+[[extensions-test-instance-pre-construct-callback]]
+=== Test Instance Pre-construct Callback
+
+`{TestInstancePreConstructCallback}` defines the API for `Extensions` that wish to be invoked
+_prior_ to test instances being constructed (by a constructor call or via
+`{TestInstanceFactory}`).
+
+This extension provides a symmetric call to `{TestInstancePreDestroyCallback}` and is useful
+in combination with other extensions to prepare constructor parameters or keeping track of test
+instances and their lifecycle.
+
 [[extensions-test-instance-factories]]
 === Test Instance Factories
 
@@ -364,6 +414,13 @@ those provided in `java.lang.reflect.Parameter` in order to avoid this bug in th
 * `boolean isAnnotated(Class<? extends Annotation> annotationType)`
 * `Optional<A> findAnnotation(Class<A> annotationType)`
 * `List<A> findRepeatableAnnotations(Class<A> annotationType)`
+====
+
+[NOTE]
+====
+Other extensions can also leverage registered `ParameterResolvers` for method and
+constructor invocations, using the `{ExecutableInvoker}` available via the
+`getExecutableInvoker()` method in the `ExtensionContext`.
 ====
 
 [[extensions-test-result-processing]]
@@ -742,27 +799,31 @@ callbacks implemented by `Extension2`. `Extension1` is therefore said to _wrap_
 JUnit Jupiter also guarantees _wrapping_ behavior within class and interface hierarchies
 for user-supplied _lifecycle methods_ (see <<writing-tests-classes-and-methods>>).
 
-* `@BeforeAll` methods are inherited from superclasses as long as they are not _hidden_ or
-  _overridden_. Furthermore, `@BeforeAll` methods from superclasses will be executed
-  **before** `@BeforeAll` methods in subclasses.
+* `@BeforeAll` methods are inherited from superclasses as long as they are not _hidden_,
+  _overridden_, or _superseded_ (i.e., replaced based on signature only, irrespective of
+  Java's visibility rules). Furthermore, `@BeforeAll` methods from superclasses will be
+  executed **before** `@BeforeAll` methods in subclasses.
 ** Similarly, `@BeforeAll` methods declared in an interface are inherited as long as they
    are not _hidden_ or _overridden_, and `@BeforeAll` methods from an interface will be
    executed **before** `@BeforeAll` methods in the class that implements the interface.
-* `@AfterAll` methods are inherited from superclasses as long as they are not _hidden_ or
-  _overridden_. Furthermore, `@AfterAll` methods from superclasses will be executed
-  **after** `@AfterAll` methods in subclasses.
+* `@AfterAll` methods are inherited from superclasses as long as they are not _hidden_,
+  _overridden_, or _superseded_ (i.e., replaced based on signature only, irrespective of
+  Java's visibility rules). Furthermore, `@AfterAll` methods from superclasses will be
+  executed **after** `@AfterAll` methods in subclasses.
 ** Similarly, `@AfterAll` methods declared in an interface are inherited as long as they
    are not _hidden_ or _overridden_, and `@AfterAll` methods from an interface will be
    executed **after** `@AfterAll` methods in the class that implements the interface.
 * `@BeforeEach` methods are inherited from superclasses as long as they are not
-  _overridden_. Furthermore, `@BeforeEach` methods from superclasses will be executed
-  **before** `@BeforeEach` methods in subclasses.
+  _overridden_ or _superseded_ (i.e., replaced based on signature only, irrespective of
+  Java's visibility rules). Furthermore, `@BeforeEach` methods from superclasses will be
+  executed **before** `@BeforeEach` methods in subclasses.
 ** Similarly, `@BeforeEach` methods declared as interface default methods are inherited as
    long as they are not _overridden_, and `@BeforeEach` default methods will be executed
    **before** `@BeforeEach` methods in the class that implements the interface.
 * `@AfterEach` methods are inherited from superclasses as long as they are not
-  _overridden_. Furthermore, `@AfterEach` methods from superclasses will be executed
-  **after** `@AfterEach` methods in subclasses.
+  _overridden_ or _superseded_ (i.e., replaced based on signature only, irrespective of
+  Java's visibility rules). Furthermore, `@AfterEach` methods from superclasses will be
+  executed **after** `@AfterEach` methods in subclasses.
 ** Similarly, `@AfterEach` methods declared as interface default methods are inherited as
    long as they are not _overridden_, and `@AfterEach` default methods will be executed
    **after** `@AfterEach` methods in the class that implements the interface.

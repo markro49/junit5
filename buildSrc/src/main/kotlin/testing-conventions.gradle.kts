@@ -15,11 +15,11 @@ tasks.withType<Test>().configureEach {
 		events = setOf(FAILED)
 		exceptionFormat = FULL
 	}
+	val isCiServer = System.getenv("CI") != null
 	retry {
-		maxRetries.set(providers.gradleProperty("retries").map(String::toInt).orElse(2))
+		maxRetries.set(providers.gradleProperty("retries").map(String::toInt).orElse(if (isCiServer) 2 else 0))
 	}
 	distribution {
-		val isCiServer = System.getenv("CI") != null
 		enabled.convention(providers.gradleProperty("enableTestDistribution")
 			.map(String::toBoolean)
 			.map { enabled -> enabled && (!isCiServer || System.getenv("GRADLE_ENTERPRISE_ACCESS_KEY").isNotBlank()) }
@@ -34,6 +34,9 @@ tasks.withType<Test>().configureEach {
 			}
 		}
 	}
+	predictiveSelection {
+		enabled.set(providers.gradleProperty("enablePredictiveTestSelection").map(String::toBoolean).orElse(true))
+	}
 	systemProperty("java.util.logging.manager", "org.apache.logging.log4j.jul.LogManager")
 	// Required until ASM officially supports the JDK 14
 	systemProperty("net.bytebuddy.experimental", true)
@@ -41,26 +44,34 @@ tasks.withType<Test>().configureEach {
 		jvmArgs(
 			"-XX:+UnlockDiagnosticVMOptions",
 			"-XX:+DebugNonSafepoints",
-			"-XX:StartFlightRecording=filename=${reports.junitXml.destination},dumponexit=true,settings=profile.jfc",
+			"-XX:StartFlightRecording=filename=${reports.junitXml.outputLocation.get()},dumponexit=true,settings=profile.jfc",
 			"-XX:FlightRecorderOptions=stackdepth=1024"
 		)
 	}
+
 	// Track OS as input so that tests are executed on all configured operating systems on CI
-	inputs.property("os", OperatingSystem.current().familyName)
+	trackOperationSystemAsInput()
+
+	jvmArgumentProviders += CommandLineArgumentProvider {
+		listOf(
+			"-Djunit.platform.reporting.open.xml.enabled=true",
+			"-Djunit.platform.reporting.output.dir=${reports.junitXml.outputLocation.get().asFile.absolutePath}"
+		)
+	}
 }
 
 dependencies {
-	val libs = project.extensions["libs"] as VersionCatalog
-	"testImplementation"(libs.findDependency("assertj").get())
-	"testImplementation"(libs.findDependency("mockito").get())
+	"testImplementation"(dependencyFromLibs("assertj"))
+	"testImplementation"(dependencyFromLibs("mockito"))
 
-	if (project != projects.jupiter.engine) {
-		"testImplementation"(projects.jupiter.aggregator)
+	if (!project.name.startsWith("junit-jupiter")) {
+		"testImplementation"(project(":junit-jupiter"))
 	}
-	"testImplementation"(testFixtures(projects.jupiter.api))
+	"testImplementation"(testFixtures(project(":junit-jupiter-api")))
 
-	"testRuntimeOnly"(projects.platform.launcher)
-	"testRuntimeOnly"(projects.platform.jfr)
+	"testRuntimeOnly"(project(":junit-platform-engine"))
+	"testRuntimeOnly"(project(":junit-platform-jfr"))
+	"testRuntimeOnly"(project(":junit-platform-reporting"))
 
-	"testRuntimeOnly"(libs.findBundle("log4j").get())
+	"testRuntimeOnly"(bundleFromLibs("log4j"))
 }

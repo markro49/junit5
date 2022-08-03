@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2021 the original author or authors.
+ * Copyright 2015-2022 the original author or authors.
  *
  * All rights reserved. This program and the accompanying materials are
  * made available under the terms of the Eclipse Public License v2.0 which
@@ -36,13 +36,29 @@ import org.checkerframework.checker.nullness.qual.Nullable;
  * <p>Unless otherwise noted, a <em>failed</em> assertion will throw an
  * {@link org.opentest4j.AssertionFailedError} or a subclass thereof.
  *
- * <h3>Kotlin Support</h3>
+ * <h2>Object Equality</h2>
+ *
+ * <p>Assertion methods comparing two objects for <em>equality</em>, such as the
+ * {@code assertEquals(expected, actual)} and {@code assertNotEquals(unexpected, actual)}
+ * variants, are <em>only</em> intended to test equality for an (un-)expected value
+ * and an actual value. They are not designed for testing whether a class correctly
+ * implements {@link Object#equals(Object)}. For example, {@code assertEquals()}
+ * might immediately return {@code true} when provided the same object for the
+ * expected and actual values, without calling {@code equals(Object)} at all.
+ * Tests that aim to verify the {@code equals(Object)} implementation should instead
+ * be written to explicitly verify the {@link Object#equals(Object)} contract by
+ * using {@link #assertTrue(boolean) assertTrue()} or {@link #assertFalse(boolean)
+ * assertFalse()} &mdash; for example, {@code assertTrue(expected.equals(actual))},
+ * {@code assertTrue(actual.equals(expected))}, {@code assertFalse(expected.equals(null))},
+ * etc.
+ *
+ * <h2>Kotlin Support</h2>
  *
  * <p>Additional <a href="https://kotlinlang.org/">Kotlin</a> assertions can be
  * found as <em>top-level functions</em> in the {@link org.junit.jupiter.api}
  * package.
  *
- * <h3>Preemptive Timeouts</h3>
+ * <h2>Preemptive Timeouts</h2>
  *
  * <p>The various {@code assertTimeoutPreemptively()} methods in this class
  * execute the provided {@code executable} or {@code supplier} in a different
@@ -63,7 +79,7 @@ import org.checkerframework.checker.nullness.qual.Nullable;
  * <p>Similar side effects may be encountered with other frameworks that rely on
  * {@code ThreadLocal} storage.
  *
- * <h3>Extensibility</h3>
+ * <h2>Extensibility</h2>
  *
  * <p>Although it is technically possible to extend this class, extension is
  * strongly discouraged. The JUnit Team highly recommends that the methods
@@ -2998,6 +3014,64 @@ public class Assertions {
 
 	/**
 	 * <em>Assert</em> that execution of the supplied {@code executable} throws
+	 * an exception of exactly the {@code expectedType} and return the exception.
+	 *
+	 * <p>If no exception is thrown, or if an exception of a different type is
+	 * thrown, this method will fail.
+	 *
+	 * <p>If you do not want to perform additional checks on the exception instance,
+	 * ignore the return value.
+	 *
+	 * @since 5.8
+	 */
+	@API(status = EXPERIMENTAL, since = "5.8")
+	public static <T extends Throwable> T assertThrowsExactly(Class<T> expectedType, Executable executable) {
+		return AssertThrowsExactly.assertThrowsExactly(expectedType, executable);
+	}
+
+	/**
+	 * <em>Assert</em> that execution of the supplied {@code executable} throws
+	 * an exception of exactly the {@code expectedType} and return the exception.
+	 *
+	 * <p>If no exception is thrown, or if an exception of a different type is
+	 * thrown, this method will fail.
+	 *
+	 * <p>If you do not want to perform additional checks on the exception instance,
+	 * ignore the return value.
+	 *
+	 * <p>Fails with the supplied failure {@code message}.
+	 *
+	 * @since 5.8
+	 */
+	@API(status = EXPERIMENTAL, since = "5.8")
+	public static <T extends Throwable> T assertThrowsExactly(Class<T> expectedType, Executable executable,
+			String message) {
+		return AssertThrowsExactly.assertThrowsExactly(expectedType, executable, message);
+	}
+
+	/**
+	 * <em>Assert</em> that execution of the supplied {@code executable} throws
+	 * an exception of exactly the {@code expectedType} and return the exception.
+	 *
+	 * <p>If no exception is thrown, or if an exception of a different type is
+	 * thrown, this method will fail.
+	 *
+	 * <p>If necessary, the failure message will be retrieved lazily from the
+	 * supplied {@code messageSupplier}.
+	 *
+	 * <p>If you do not want to perform additional checks on the exception instance,
+	 * ignore the return value.
+	 *
+	 * @since 5.8
+	 */
+	@API(status = EXPERIMENTAL, since = "5.8")
+	public static <T extends Throwable> T assertThrowsExactly(Class<T> expectedType, Executable executable,
+			Supplier<String> messageSupplier) {
+		return AssertThrowsExactly.assertThrowsExactly(expectedType, executable, messageSupplier);
+	}
+
+	/**
+	 * <em>Assert</em> that execution of the supplied {@code executable} throws
 	 * an exception of the {@code expectedType} and return the exception.
 	 *
 	 * <p>If no exception is thrown, or if an exception of a different type is
@@ -3050,7 +3124,7 @@ public class Assertions {
 	 * <em>Assert</em> that execution of the supplied {@code executable} does
 	 * <em>not</em> throw any kind of {@linkplain Throwable exception}.
 	 *
-	 * <h3>Usage Note</h3>
+	 * <h4>Usage Note</h4>
 	 * <p>Although any exception thrown from a test method will cause the test
 	 * to <em>fail</em>, there are certain use cases where it can be beneficial
 	 * to explicitly assert that an exception is not thrown for a given code
@@ -3067,7 +3141,7 @@ public class Assertions {
 	 * <em>Assert</em> that execution of the supplied {@code executable} does
 	 * <em>not</em> throw any kind of {@linkplain Throwable exception}.
 	 *
-	 * <h3>Usage Note</h3>
+	 * <h4>Usage Note</h4>
 	 * <p>Although any exception thrown from a test method will cause the test
 	 * to <em>fail</em>, there are certain use cases where it can be beneficial
 	 * to explicitly assert that an exception is not thrown for a given code
@@ -3086,7 +3160,7 @@ public class Assertions {
 	 * <em>Assert</em> that execution of the supplied {@code executable} does
 	 * <em>not</em> throw any kind of {@linkplain Throwable exception}.
 	 *
-	 * <h3>Usage Note</h3>
+	 * <h4>Usage Note</h4>
 	 * <p>Although any exception thrown from a test method will cause the test
 	 * to <em>fail</em>, there are certain use cases where it can be beneficial
 	 * to explicitly assert that an exception is not thrown for a given code
@@ -3110,7 +3184,7 @@ public class Assertions {
 	 *
 	 * <p>If the assertion passes, the {@code supplier}'s result will be returned.
 	 *
-	 * <h3>Usage Note</h3>
+	 * <h4>Usage Note</h4>
 	 * <p>Although any exception thrown from a test method will cause the test
 	 * to <em>fail</em>, there are certain use cases where it can be beneficial
 	 * to explicitly assert that an exception is not thrown for a given code
@@ -3131,7 +3205,7 @@ public class Assertions {
 	 *
 	 * <p>Fails with the supplied failure {@code message}.
 	 *
-	 * <h3>Usage Note</h3>
+	 * <h4>Usage Note</h4>
 	 * <p>Although any exception thrown from a test method will cause the test
 	 * to <em>fail</em>, there are certain use cases where it can be beneficial
 	 * to explicitly assert that an exception is not thrown for a given code
@@ -3153,7 +3227,7 @@ public class Assertions {
 	 * <p>If necessary, the failure message will be retrieved lazily from the
 	 * supplied {@code messageSupplier}.
 	 *
-	 * <h3>Usage Note</h3>
+	 * <h4>Usage Note</h4>
 	 * <p>Although any exception thrown from a test method will cause the test
 	 * to <em>fail</em>, there are certain use cases where it can be beneficial
 	 * to explicitly assert that an exception is not thrown for a given code

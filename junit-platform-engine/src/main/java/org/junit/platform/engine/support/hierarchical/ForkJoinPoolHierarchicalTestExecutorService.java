@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2021 the original author or authors.
+ * Copyright 2015-2022 the original author or authors.
  *
  * All rights reserved. This program and the accompanying materials are
  * made available under the terms of the Eclipse Public License v2.0 which
@@ -40,9 +40,9 @@ import org.junit.platform.engine.ConfigurationParameters;
  * {@linkplain HierarchicalTestExecutorService executor service} that executes
  * {@linkplain TestTask test tasks} with the configured parallelism.
  *
+ * @since 1.3
  * @see ForkJoinPool
  * @see DefaultParallelExecutionConfigurationStrategy
- * @since 1.3
  */
 @API(status = EXPERIMENTAL, since = "1.3")
 public class ForkJoinPoolHierarchicalTestExecutorService implements HierarchicalTestExecutorService {
@@ -88,7 +88,7 @@ public class ForkJoinPoolHierarchicalTestExecutorService implements Hierarchical
 				Integer.TYPE, Integer.TYPE, Predicate.class, Long.TYPE, TimeUnit.class);
 			return constructor.newInstance(configuration.getParallelism(), threadFactory, null, false,
 				configuration.getCorePoolSize(), configuration.getMaxPoolSize(), configuration.getMinimumRunnable(),
-				null, configuration.getKeepAliveSeconds(), TimeUnit.SECONDS);
+				configuration.getSaturatePredicate(), configuration.getKeepAliveSeconds(), TimeUnit.SECONDS);
 		}).orElseTry(() -> {
 			// Fallback for Java 8
 			return new ForkJoinPool(configuration.getParallelism(), threadFactory, null, false);

@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2021 the original author or authors.
+ * Copyright 2015-2022 the original author or authors.
  *
  * All rights reserved. This program and the accompanying materials are
  * made available under the terms of the Eclipse Public License v2.0 which
@@ -20,6 +20,9 @@ import static org.junit.jupiter.api.condition.EnabledOnJreIntegrationTests.onJav
 import static org.junit.jupiter.api.condition.EnabledOnJreIntegrationTests.onJava15;
 import static org.junit.jupiter.api.condition.EnabledOnJreIntegrationTests.onJava16;
 import static org.junit.jupiter.api.condition.EnabledOnJreIntegrationTests.onJava17;
+import static org.junit.jupiter.api.condition.EnabledOnJreIntegrationTests.onJava18;
+import static org.junit.jupiter.api.condition.EnabledOnJreIntegrationTests.onJava19;
+import static org.junit.jupiter.api.condition.EnabledOnJreIntegrationTests.onJava20;
 import static org.junit.jupiter.api.condition.EnabledOnJreIntegrationTests.onJava8;
 import static org.junit.jupiter.api.condition.EnabledOnJreIntegrationTests.onJava9;
 
@@ -167,13 +170,40 @@ class DisabledOnJreConditionTests extends AbstractExecutionConditionTests {
 	}
 
 	/**
+	 * @see DisabledOnJreIntegrationTests#java18()
+	 */
+	@Test
+	void java18() {
+		evaluateCondition();
+		assertDisabledOnCurrentJreIf(onJava18());
+	}
+
+	/**
+	 * @see DisabledOnJreIntegrationTests#java19()
+	 */
+	@Test
+	void java19() {
+		evaluateCondition();
+		assertDisabledOnCurrentJreIf(onJava19());
+	}
+
+	/**
+	 * @see DisabledOnJreIntegrationTests#java20()
+	 */
+	@Test
+	void java20() {
+		evaluateCondition();
+		assertDisabledOnCurrentJreIf(onJava20());
+	}
+
+	/**
 	 * @see DisabledOnJreIntegrationTests#other()
 	 */
 	@Test
 	void other() {
 		evaluateCondition();
 		assertDisabledOnCurrentJreIf(!(onJava8() || onJava9() || onJava10() || onJava11() || onJava12() || onJava13()
-				|| onJava14() || onJava15() || onJava16() || onJava17()));
+				|| onJava14() || onJava15() || onJava16() || onJava17() || onJava18() || onJava19() || onJava20()));
 	}
 
 	private void assertDisabledOnCurrentJreIf(boolean condition) {

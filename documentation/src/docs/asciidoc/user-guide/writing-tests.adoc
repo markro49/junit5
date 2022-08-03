@@ -29,15 +29,16 @@ in the `junit-jupiter-api` module.
 | `@RepeatedTest`          | Denotes that a method is a test template for a <<writing-tests-repeated-tests, repeated test>>. Such methods are _inherited_ unless they are _overridden_.
 | `@TestFactory`           | Denotes that a method is a test factory for <<writing-tests-dynamic-tests, dynamic tests>>. Such methods are _inherited_ unless they are _overridden_.
 | `@TestTemplate`          | Denotes that a method is a <<writing-tests-test-templates, template for test cases>> designed to be invoked multiple times depending on the number of invocation contexts returned by the registered <<extensions-test-templates, providers>>. Such methods are _inherited_ unless they are _overridden_.
-| `@TestMethodOrder`       | Used to configure the <<writing-tests-test-execution-order, test method execution order>> for the annotated test class; similar to JUnit 4's `@FixMethodOrder`. Such annotations are _inherited_.
+| `@TestClassOrder`        | Used to configure the <<writing-tests-test-execution-order-classes, test class execution order>> for `@Nested` test classes in the annotated test class. Such annotations are _inherited_.
+| `@TestMethodOrder`       | Used to configure the <<writing-tests-test-execution-order-methods, test method execution order>> for the annotated test class; similar to JUnit 4's `@FixMethodOrder`. Such annotations are _inherited_.
 | `@TestInstance`          | Used to configure the <<writing-tests-test-instance-lifecycle, test instance lifecycle>> for the annotated test class. Such annotations are _inherited_.
 | `@DisplayName`           | Declares a custom <<writing-tests-display-names,display name>> for the test class or test method. Such annotations are not _inherited_.
 | `@DisplayNameGeneration` | Declares a custom <<writing-tests-display-name-generator,display name generator>> for the test class. Such annotations are _inherited_.
-| `@BeforeEach`            | Denotes that the annotated method should be executed _before_ *each* `@Test`, `@RepeatedTest`, `@ParameterizedTest`, or `@TestFactory` method in the current class; analogous to JUnit 4's `@Before`. Such methods are _inherited_ unless they are _overridden_.
-| `@AfterEach`             | Denotes that the annotated method should be executed _after_ *each* `@Test`, `@RepeatedTest`, `@ParameterizedTest`, or `@TestFactory` method in the current class; analogous to JUnit 4's `@After`. Such methods are _inherited_ unless they are _overridden_.
-| `@BeforeAll`             | Denotes that the annotated method should be executed _before_ *all* `@Test`, `@RepeatedTest`, `@ParameterizedTest`, and `@TestFactory` methods in the current class; analogous to JUnit 4's `@BeforeClass`. Such methods are _inherited_ (unless they are _hidden_ or _overridden_) and must be `static` (unless the "per-class" <<writing-tests-test-instance-lifecycle, test instance lifecycle>> is used).
-| `@AfterAll`              | Denotes that the annotated method should be executed _after_ *all* `@Test`, `@RepeatedTest`, `@ParameterizedTest`, and `@TestFactory` methods in the current class; analogous to JUnit 4's `@AfterClass`. Such methods are _inherited_ (unless they are _hidden_ or _overridden_) and must be `static` (unless the "per-class" <<writing-tests-test-instance-lifecycle, test instance lifecycle>> is used).
-| `@Nested`                | Denotes that the annotated class is a non-static <<writing-tests-nested,nested test class>>. `@BeforeAll` and `@AfterAll` methods cannot be used directly in a `@Nested` test class unless the "per-class" <<writing-tests-test-instance-lifecycle, test instance lifecycle>> is used. Such annotations are not _inherited_.
+| `@BeforeEach`            | Denotes that the annotated method should be executed _before_ *each* `@Test`, `@RepeatedTest`, `@ParameterizedTest`, or `@TestFactory` method in the current class; analogous to JUnit 4's `@Before`. Such methods are _inherited_ – unless they are _overridden_ or _superseded_ (i.e., replaced based on signature only, irrespective of Java's visibility rules).
+| `@AfterEach`             | Denotes that the annotated method should be executed _after_ *each* `@Test`, `@RepeatedTest`, `@ParameterizedTest`, or `@TestFactory` method in the current class; analogous to JUnit 4's `@After`. Such methods are _inherited_ – unless they are _overridden_ or _superseded_ (i.e., replaced based on signature only, irrespective of Java's visibility rules).
+| `@BeforeAll`             | Denotes that the annotated method should be executed _before_ *all* `@Test`, `@RepeatedTest`, `@ParameterizedTest`, and `@TestFactory` methods in the current class; analogous to JUnit 4's `@BeforeClass`. Such methods are _inherited_ – unless they are _hidden_, _overridden_, or _superseded_, (i.e., replaced based on signature only, irrespective of Java's visibility rules) – and must be `static` unless the "per-class" <<writing-tests-test-instance-lifecycle, test instance lifecycle>> is used.
+| `@AfterAll`              | Denotes that the annotated method should be executed _after_ *all* `@Test`, `@RepeatedTest`, `@ParameterizedTest`, and `@TestFactory` methods in the current class; analogous to JUnit 4's `@AfterClass`. Such methods are _inherited_ – unless they are _hidden_, _overridden_, or _superseded_, (i.e., replaced based on signature only, irrespective of Java's visibility rules) – and must be `static` unless the "per-class" <<writing-tests-test-instance-lifecycle, test instance lifecycle>> is used.
+| `@Nested`                | Denotes that the annotated class is a non-static <<writing-tests-nested,nested test class>>. On Java 8 through Java 15, `@BeforeAll` and `@AfterAll` methods cannot be used directly in a `@Nested` test class unless the "per-class" <<writing-tests-test-instance-lifecycle, test instance lifecycle>> is used. Beginning with Java 16, `@BeforeAll` and `@AfterAll` methods can be declared as `static` in a `@Nested` test class with either test instance lifecycle mode. Such annotations are not _inherited_.
 | `@Tag`                   | Used to declare <<writing-tests-tagging-and-filtering,tags for filtering tests>>, either at the class or method level; analogous to test groups in TestNG or Categories in JUnit 4. Such annotations are _inherited_ at the class level but not at the method level.
 | `@Disabled`              | Used to <<writing-tests-disabling,disable>> a test class or test method; analogous to JUnit 4's `@Ignore`. Such annotations are not _inherited_.
 | `@Timeout`               | Used to fail a test, test factory, test template, or lifecycle method if its execution exceeds a given duration. Such annotations are _inherited_.
@@ -96,27 +97,57 @@ void myFastTest() {
 }
 ----
 
-[[writing-tests-classes-and-methods]]
-=== Test Classes and Methods
+[[writing-tests-definitions]]
+=== Definitions
 
-**Test Class**: any top-level class, `static` member class, or <<writing-tests-nested,
-`@Nested` class>> that contains at least one _test method_.
+.Platform Concepts
+****
+Container::
+a node in the test tree that contains other containers or tests as its children (e.g. a _test class_).
 
+Test::
+a node in the test tree that verifies expected behavior when executed (e.g. a `@Test` method).
+****
+
+.Jupiter Concepts
+****
+Lifecycle Method::
+any method that is directly annotated or meta-annotated with
+`@BeforeAll`, `@AfterAll`, `@BeforeEach`, or `@AfterEach`.
+
+Test Class::
+any top-level class, `static` member class, or <<writing-tests-nested,
+`@Nested` class>> that contains at least one _test method_, i.e. a _container_.
 Test classes must not be `abstract` and must have a single constructor.
 
-**Test Method**: any instance method that is directly annotated or meta-annotated with
+Test Method::
+any instance method that is directly annotated or meta-annotated with
 `@Test`, `@RepeatedTest`, `@ParameterizedTest`, `@TestFactory`, or `@TestTemplate`.
+With the exception of `@Test`, these create a _container_ in the test tree that groups
+_tests_ or, potentially (for `@TestFactory`), other _containers_.
+****
 
-**Lifecycle Method**: any method that is directly annotated or meta-annotated with
-`@BeforeAll`, `@AfterAll`, `@BeforeEach`, or `@AfterEach`.
+[[writing-tests-classes-and-methods]]
+=== Test Classes and Methods
 
 Test methods and lifecycle methods may be declared locally within the current test class,
 inherited from superclasses, or inherited from interfaces (see
 <<writing-tests-test-interfaces-and-default-methods>>). In addition, test methods and
-lifecycle methods must not be `abstract` and must not return a value.
+lifecycle methods must not be `abstract` and must not return a value (except `@TestFactory`
+methods which are required to return a value).
 
-NOTE: Test classes, test methods, and lifecycle methods are not required to be `public`,
-but they must _not_ be `private`.
+[NOTE]
+.Class and method visibility
+====
+Test classes, test methods, and lifecycle methods are not required to be `public`, but
+they must _not_ be `private`.
+
+It is generally recommended to omit the `public` modifier for test classes, test methods,
+and lifecycle methods unless there is a technical reason for doing so – for example, when
+a test class is extended by a test class in another package. Another technical reason for
+making classes and methods `public` is to simplify testing on the module path when using
+the Java Module System.
+====
 
 The following test class demonstrates the use of `@Test` methods and all supported
 lifecycle methods. For further information on runtime semantics, see
@@ -239,11 +270,10 @@ include::{testDir}/example/AssertionsDemo.java[tags=user_guide]
 [WARNING]
 .Preemptive Timeouts with `assertTimeoutPreemptively()`
 ====
-Contrary to <<writing-tests-declarative-timeouts, declarative timeouts>>, the various
-`assertTimeoutPreemptively()` methods in the `Assertions` class execute the provided
-`executable` or `supplier` in a different thread than that of the calling code. This
-behavior can lead to undesirable side effects if the code that is executed within the
-`executable` or `supplier` relies on `java.lang.ThreadLocal` storage.
+The various`assertTimeoutPreemptively()` methods in the `Assertions` class execute
+the provided `executable` or `supplier` in a different thread than that of the calling
+code. This behavior can lead to undesirable side effects if the code that is executed
+within the `executable` or `supplier` relies on `java.lang.ThreadLocal` storage.
 
 One common example of this is the transactional testing support in the Spring Framework.
 Specifically, Spring's testing support binds transaction state to the current thread (via
@@ -388,15 +418,24 @@ the `org.junit.jupiter.api.condition` package.
 ====
 
 [[writing-tests-conditional-execution-os]]
-==== Operating System Conditions
+==== Operating System and Architecture Conditions
 
-A container or test may be enabled or disabled on a particular operating system via the
-`{EnabledOnOs}` and `{DisabledOnOs}` annotations.
+A container or test may be enabled or disabled on a particular operating system,
+architecture, or combination of both via the `{EnabledOnOs}` and `{DisabledOnOs}`
+annotations.
 
 [[writing-tests-conditional-execution-os-demo]]
 [source,java,indent=0]
+.Conditional execution based on operating system
 ----
 include::{testDir}/example/ConditionalTestExecutionDemo.java[tags=user_guide_os]
+----
+
+[[writing-tests-conditional-execution-architectures-demo]]
+[source,java,indent=0]
+.Conditional execution based on architecture
+----
+include::{testDir}/example/ConditionalTestExecutionDemo.java[tags=user_guide_architecture]
 ----
 
 [[writing-tests-conditional-execution-jre]]
@@ -460,10 +499,13 @@ indirectly present, or meta-present on a given element.
 [[writing-tests-conditional-execution-custom]]
 ==== Custom Conditions
 
-A container or test may be enabled or disabled based on the boolean return of a
-method via the `{EnabledIf}` and `{DisabledIf}` annotations. The method is provided to
-the annotation via its name.
-If needed, the condition method can take a single parameter of type `ExtensionContext`.
+As an alternative to implementing an <<extensions-conditions, `ExecutionCondition`>>, a
+container or test may be enabled or disabled based on a _condition method_ configured via
+the `{EnabledIf}` and `{DisabledIf}` annotations. A condition method must have a `boolean`
+return type and may accept either no arguments or a single `ExtensionContext` argument.
+
+The following test class demonstrates how to configure a local method named
+`customCondition` via `@EnabledIf` and `@DisabledIf`.
 
 [source,java,indent=0]
 ----
@@ -471,7 +513,7 @@ include::{testDir}/example/ConditionalTestExecutionDemo.java[tags=user_guide_cus
 ----
 
 Alternatively, the condition method can be located outside the test class. In this case,
-it has to be referenced by its _fully qualified name_ as demonstrated in the following
+it must be referenced by its _fully qualified name_ as demonstrated in the following
 example.
 
 [source,java,indent=0]
@@ -481,34 +523,35 @@ package example;
 include::{testDir}/example/ExternalCustomConditionDemo.java[tags=user_guide_external_custom_condition]
 ----
 
-NOTE: When `{EnabledIf}` or `{DisabledIf}` is used at class level, the condition method
-must always be `static`. Condition methods located in external classes must also be
-`static`. In any other case, you can use both static or instance methods.
+NOTE: When `@EnabledIf` or `@DisabledIf` is used at class level, the condition method must
+always be `static`. Condition methods located in external classes must also be `static`.
+In any other case, you can use either static methods or instance methods as condition
+methods.
 
+[TIP]
+====
+It is often the case that you can use an existing static method in a utility class as a
+custom condition.
+
+For example, `java.awt.GraphicsEnvironment` provides a `public static boolean isHeadless()`
+method that can be used to determine if the current environment does not support a
+graphical display. Thus, if you have a test that depends on graphical support you can
+disable it when such support is unavailable as follows.
+
+[source,java,indent=0]
+----
+@DisabledIf(value = "java.awt.GraphicsEnvironment#isHeadless",
+	disabledReason = "headless environment")
+----
+====
 
 [[writing-tests-tagging-and-filtering]]
 === Tagging and Filtering
 
 Test classes and methods can be tagged via the `@Tag` annotation. Those tags can later be
-used to filter <<running-tests,test discovery and execution>>.
-
-TIP: See also: <<running-tests-tag-expressions>>
-
-==== Syntax Rules for Tags
-
-* A tag must not be `null` or _blank_.
-* A _trimmed_ tag must not contain whitespace.
-* A _trimmed_ tag must not contain ISO control characters.
-* A _trimmed_ tag must not contain any of the following _reserved characters_.
-  - `,`: _comma_
-  - `(`: _left parenthesis_
-  - `)`: _right parenthesis_
-  - `&`: _ampersand_
-  - `|`: _vertical bar_
-  - `!`: _exclamation point_
-
-NOTE: In the above context, "trimmed" means that leading and trailing whitespace
-characters have been removed.
+used to filter <<running-tests, test discovery and execution>>. Please refer to the
+<<running-tests-tags>> section for more information about tag support in the JUnit
+Platform.
 
 [source,java,indent=0]
 ----
@@ -529,6 +572,7 @@ repeatable builds.
 NOTE: See <<writing-tests-classes-and-methods>> for a definition of _test method_ and
 _test class_.
 
+[[writing-tests-test-execution-order-methods]]
 ==== Method Order
 
 Although true _unit tests_ typically should not rely on the order in which they are
@@ -565,7 +609,7 @@ order specified via the `@Order` annotation.
 include::{testDir}/example/OrderedTestsDemo.java[tags=user_guide]
 ----
 
-[[writing-tests-test-execution-order-default]]
+[[writing-tests-test-execution-order-methods-default]]
 ===== Setting the Default Method Orderer
 
 You can use the `junit.jupiter.testmethod.order.default` <<running-tests-config-params,
@@ -588,30 +632,33 @@ junit.jupiter.testmethod.order.default = \
 Similarly, you can specify the fully qualified name of any custom class that implements
 `MethodOrderer`.
 
+[[writing-tests-test-execution-order-classes]]
 ==== Class Order
 
-For build optimization purposes, it can be helpful to run _test classes_ in a specific
-order.
+Although test classes typically should not rely on the order in which they are executed,
+there are times when it is desirable to enforce a specific test class execution order. You
+may wish to execute test classes in a random order to ensure there are no accidental
+dependencies between test classes, or you may wish to order test classes to optimize build
+time as outlined in the following scenarios.
 
-For example:
+* Run previously failing tests and faster tests first: "fail fast" mode
+* With parallel execution enabled, run longer tests first: "shortest test plan execution
+  duration" mode
+* Various other use cases
 
-* previously failed tests and faster tests first: fail fast
-* with parallelism enabled, longer tests first: shortest test execution duration
-* etc.
-
-You can use the `junit.jupiter.testclass.order.default` <<running-tests-config-params,
-configuration parameter>> to specify the fully qualified class name of the
-`{ClassOrderer}` you would like to use. The supplied class must implement the
-`ClassOrderer` interface.
+To configure test class execution order _globally_ for the entire test suite, use the
+`junit.jupiter.testclass.order.default` <<running-tests-config-params, configuration
+parameter>> to specify the fully qualified class name of the `{ClassOrderer}` you would
+like to use. The supplied class must implement the `ClassOrderer` interface.
 
 You can implement your own custom `ClassOrderer` or use one of the following built-in
 `ClassOrderer` implementations.
 
+* `{ClassOrderer_ClassName}`: sorts test classes _alphanumerically_ based on their fully
+  qualified class names
 * `{ClassOrderer_DisplayName}`: sorts test classes _alphanumerically_ based on their
   display names (see <<writing-tests-display-name-generator-precedence-rules, display name
   generation precedence rules>>)
-* `{ClassOrderer_ClassName}`: sorts test classes _alphanumerically_ based on their fully
-  qualified class names
 * `{ClassOrderer_OrderAnnotation}`: sorts test classes _numerically_ based on values
   specified via the `{Order}` annotation
 * `{ClassOrderer_Random}`: orders test classes _pseudo-randomly_ and supports
@@ -626,6 +673,30 @@ parameter with the corresponding fully qualified class name (e.g., in
 ----
 junit.jupiter.testclass.order.default = \
     org.junit.jupiter.api.ClassOrderer$OrderAnnotation
+----
+
+The configured `ClassOrderer` will be applied to all top-level test classes (including
+`static` nested test classes) and `@Nested` test classes.
+
+NOTE: Top-level test classes will be ordered relative to each other; whereas, `@Nested`
+test classes will be ordered relative to other `@Nested` test classes sharing the same
+_enclosing class_.
+
+To configure test class execution order _locally_ for `@Nested` test classes, declare the
+`{TestClassOrder}` annotation on the enclosing class for the `@Nested` test classes you
+want to order, and supply a class reference to the `ClassOrderer` implementation you would
+like to use directly in the `@TestClassOrder` annotation. The configured `ClassOrderer`
+will be applied recursively to `@Nested` test classes and their `@Nested` test classes.
+Note that a local `@TestClassOrder` declaration always overrides an inherited
+`@TestClassOrder` declaration or a `ClassOrderer` configured globally via the
+`junit.jupiter.testclass.order.default` configuration parameter.
+
+The following example demonstrates how to guarantee that `@Nested` test classes are
+executed in the order specified via the `@Order` annotation.
+
+[source,java,indent=0]
+----
+include::{testDir}/example/OrderedNestedTestClassesDemo.java[tags=user_guide]
 ----
 
 [[writing-tests-test-instance-lifecycle]]
@@ -652,6 +723,9 @@ Specifically, with the "per-class" mode it becomes possible to declare `@BeforeA
 `@AfterAll` on non-static methods as well as on interface `default` methods. The
 "per-class" mode therefore also makes it possible to use `@BeforeAll` and `@AfterAll`
 methods in `@Nested` test classes.
+
+NOTE: Beginning with Java 16, `@BeforeAll` and `@AfterAll` methods can be declared as
+`static` in `@Nested` test classes.
 
 If you are authoring tests using the Kotlin programming language, you may also find it
 easier to implement `@BeforeAll` and `@AfterAll` methods by switching to the "per-class"
@@ -723,10 +797,13 @@ running the outer tests, because the setup code from the outer tests is always e
 
 NOTE: _Only non-static nested classes_ (i.e. _inner classes_) can serve as `@Nested` test
 classes. Nesting can be arbitrarily deep, and those inner classes are subject to full
-lifecycle support with one exception: `@BeforeAll` and `@AfterAll` methods do not work
-_by default_. The reason is that Java does not allow `static` members in inner classes.
-However, this restriction can be circumvented by annotating a `@Nested` test class with
-`@TestInstance(Lifecycle.PER_CLASS)` (see <<writing-tests-test-instance-lifecycle>>).
+lifecycle support with one exception: `@BeforeAll` and `@AfterAll` methods do not work _by
+default_. The reason is that Java does not allow `static` members in inner classes prior
+to Java 16. However, this restriction can be circumvented by annotating a `@Nested` test
+class with `@TestInstance(Lifecycle.PER_CLASS)` (see
+<<writing-tests-test-instance-lifecycle>>). If you are using Java 16 or higher,
+`@BeforeAll` and `@AfterAll` methods can be declared as `static` in `@Nested` test
+classes, and this restriction no longer applies.
 
 [[writing-tests-dependency-injection]]
 === Dependency Injection for Constructors and Methods
@@ -1094,6 +1171,21 @@ parameterized method at the same index in the method's formal parameter list. An
 _aggregator_ is any parameter of type `ArgumentsAccessor` or any parameter annotated with
 `@AggregateWith`.
 
+[NOTE]
+.AutoCloseable arguments
+====
+Arguments that implement `java.lang.AutoCloseable` (or `java.io.Closeable` which extends
+`java.lang.AutoCloseable`) will be automatically closed after `@AfterEach` methods and
+`AfterEachCallback` extensions have been called for the current parameterized test
+invocation.
+
+To prevent this from happening, set the `autoCloseArguments` attribute in
+`@ParameterizedTest` to `false`. Specifically, if an argument that implements
+`AutoCloseable` is reused for multiple invocations of the same parameterized test method,
+you must annotate the method with `@ParameterizedTest(autoCloseArguments = false)` to
+ensure that the argument is not closed between invocations.
+====
+
 [[writing-tests-parameterized-tests-sources]]
 ==== Sources of Arguments
 
@@ -1228,7 +1320,7 @@ or external classes.
 
 Factory methods within the test class must be `static` unless the test class is annotated
 with `@TestInstance(Lifecycle.PER_CLASS)`; whereas, factory methods in external classes
-must always be `static`. In addition, such factory methods must not accept any arguments.
+must always be `static`.
 
 Each factory method must generate a _stream_ of _arguments_, and each set of arguments
 within the stream will be provided as the physical arguments for individual invocations
@@ -1278,8 +1370,8 @@ interface. In addition, `Arguments.of(Object...)` may be used as an alternative 
 include::{testDir}/example/ParameterizedTestDemo.java[tags=multi_arg_MethodSource_example]
 ----
 
-An external, `static` _factory_ method can be referenced by providing its _fully
-qualified method name_ as demonstrated in the following example.
+An external, `static` _factory_ method can be referenced by providing its _fully qualified
+method name_ as demonstrated in the following example.
 
 [source,java,indent=0]
 ----
@@ -1288,11 +1380,27 @@ package example;
 include::{testDir}/example/ExternalMethodSourceDemo.java[tags=external_MethodSource_example]
 ----
 
+Factory methods can declare parameters, which will be provided by registered
+implementations of the `ParameterResolver` extension API. In the following example, the
+factory method is referenced by its name since there is only one such method in the test
+class. If there are several methods with the same name, the factory method must be
+referenced by its fully qualified method name – for example,
+`@MethodSource("example.MyTests#factoryMethodWithArguments(java.lang.String)")`.
+
+[source,java,indent=0]
+----
+include::{testDir}/example/MethodSourceParameterResolutionDemo.java[tags=parameter_resolution_MethodSource_example]
+----
+
+
 [[writing-tests-parameterized-tests-sources-CsvSource]]
 ===== @CsvSource
 
-`@CsvSource` allows you to express argument lists as comma-separated values (i.e.,
-`String` literals).
+`@CsvSource` allows you to express argument lists as comma-separated values (i.e., CSV
+`String` literals). Each string provided via the `value` attribute in `@CsvSource`
+represents a CSV record and results in one invocation of the parameterized test. The first
+record may optionally be used to supply CSV headers (see the Javadoc for the
+`useHeadersInDisplayName` attribute for details and an example).
 
 [source,java,indent=0]
 ----
@@ -1304,19 +1412,20 @@ The default delimiter is a comma (`,`), but you can use another character by set
 `String` delimiter instead of a single character. However, both delimiter attributes
 cannot be set simultaneously.
 
-`@CsvSource` uses a single quote `'` as its quote character. See the `'lemon, lime'` value
-in the example above and in the table below. An empty, quoted value `''` results in an
-empty `String` unless the `emptyValue` attribute is set; whereas, an entirely _empty_
-value is interpreted as a `null` reference. By specifying one or more `nullValues`, a
-custom value can be interpreted as a `null` reference (see the `NIL` example in the table
-below). An `ArgumentConversionException` is thrown if the target type of a `null`
-reference is a primitive type.
+By default, `@CsvSource` uses a single quote (`'`) as its quote character, but this can be
+changed via the `quoteCharacter` attribute. See the `'lemon, lime'` value in the example
+above and in the table below. An empty, quoted value (`''`) results in an empty `String`
+unless the `emptyValue` attribute is set; whereas, an entirely _empty_ value is
+interpreted as a `null` reference. By specifying one or more `nullValues`, a custom value
+can be interpreted as a `null` reference (see the `NIL` example in the table below). An
+`ArgumentConversionException` is thrown if the target type of a `null` reference is a
+primitive type.
 
 NOTE: An _unquoted_ empty value will always be converted to a `null` reference regardless
 of any custom values configured via the `nullValues` attribute.
 
-Unless it starts with a quote character, leading and trailing whitespaces of a
-CSV column are trimmed by default. This behavior can be changed by setting the
+Except within a quoted string, leading and trailing whitespace in a CSV column is trimmed
+by default. This behavior can be changed by setting the
 `ignoreLeadingAndTrailingWhitespace` attribute to `true`.
 
 [cols="50,50"]
@@ -1331,11 +1440,87 @@ CSV column are trimmed by default. This behavior can be changed by setting the
 | `@CsvSource(value = { " apple , banana" }, ignoreLeadingAndTrailingWhitespace = false)` | `" apple "`, `" banana"`
 |===
 
+If the programming language you are using supports _text blocks_ -- for example, Java SE
+15 or higher -- you can alternatively use the `textBlock` attribute of `@CsvSource`. Each
+record within a text block represents a CSV record and results in one invocation of the
+parameterized test. The first record may optionally be used to supply CSV headers by
+setting the `useHeadersInDisplayName` attribute to `true` as in the example below.
+
+Using a text block, the previous example can be implemented as follows.
+
+[source,java,indent=0]
+----
+@ParameterizedTest(name = "[{index}] {arguments}")
+@CsvSource(useHeadersInDisplayName = true, textBlock = """
+	FRUIT,         RANK
+	apple,         1
+	banana,        2
+	'lemon, lime', 0xF1
+	strawberry,    700_000
+	""")
+void testWithCsvSource(String fruit, int rank) {
+	// ...
+}
+----
+
+The generated display names for the previous example include the CSV header names.
+
+----
+[1] FRUIT = apple, RANK = 1
+[2] FRUIT = banana, RANK = 2
+[3] FRUIT = lemon, lime, RANK = 0xF1
+[4] FRUIT = strawberry, RANK = 700_000
+----
+
+In contrast to CSV records supplied via the `value` attribute, a text block can contain
+comments. Any line beginning with a `+++#+++` symbol will be treated as a comment and
+ignored. Note, however, that the `+++#+++` symbol must be the first character on the line
+without any leading whitespace. It is therefore recommended that the closing text block
+delimiter (`"""`) be placed either at the end of the last line of input or on the
+following line, left aligned with the rest of the input (as can be seen in the example
+below which demonstrates formatting similar to a table).
+
+[source,java,indent=0]
+----
+@ParameterizedTest
+@CsvSource(delimiter = '|', quoteCharacter = '"', textBlock = """
+	#-----------------------------
+	#    FRUIT     |     RANK
+	#-----------------------------
+	     apple     |      1
+	#-----------------------------
+	     banana    |      2
+	#-----------------------------
+	  "lemon lime" |     0xF1
+	#-----------------------------
+	   strawberry  |    700_000
+	#-----------------------------
+	""")
+void testWithCsvSource(String fruit, int rank) {
+	// ...
+}
+----
+
+[NOTE]
+====
+Java's https://docs.oracle.com/en/java/javase/15/text-blocks/index.html[text block]
+feature automatically removes _incidental whitespace_ when the code is compiled.
+However other JVM languages such as Groovy and Kotlin do not. Thus, if you are using a
+programming language other than Java and your text block contains comments or new lines
+within quoted strings, you will need to ensure that there is no leading whitespace within
+your text block.
+====
+
 [[writing-tests-parameterized-tests-sources-CsvFileSource]]
 ===== @CsvFileSource
 
-`@CsvFileSource` lets you use CSV files from the classpath or the local file system. Each
-line from a CSV file results in one invocation of the parameterized test.
+`@CsvFileSource` lets you use comma-separated value (CSV) files from the classpath or the
+local file system. Each record from a CSV file results in one invocation of the
+parameterized test. The first record may optionally be used to supply CSV headers. You can
+instruct JUnit to ignore the headers via the `numLinesToSkip` attribute. If you would like
+for the headers to be used in the display names, you can set the `useHeadersInDisplayName`
+attribute to `true`. The examples below demonstrate the use of `numLinesToSkip` and
+`useHeadersInDisplayName`.
 
 The default delimiter is a comma (`,`), but you can use another character by setting the
 `delimiter` attribute. Alternatively, the `delimiterString` attribute allows you to use a
@@ -1343,8 +1528,8 @@ The default delimiter is a comma (`,`), but you can use another character by set
 cannot be set simultaneously.
 
 .Comments in CSV files
-NOTE: Any line beginning with a `#` symbol will be interpreted as a comment and will be
-ignored.
+NOTE: Any line beginning with a `+++#+++` symbol will be interpreted as a comment and will
+be ignored.
 
 [source,java,indent=0]
 ----
@@ -1357,19 +1542,40 @@ include::{testDir}/example/ParameterizedTestDemo.java[tags=CsvFileSource_example
 include::{testResourcesDir}/two-column.csv[]
 ----
 
-In contrast to the syntax used in `@CsvSource`, `@CsvFileSource` uses a double quote `"`
-as the quote character. See the `"United States of America"` value in the example above.
-An empty, quoted value `""` results in an empty `String` unless the `emptyValue` attribute
-is set; whereas, an entirely _empty_ value is interpreted as a `null` reference. By
-specifying one or more `nullValues`, a custom value can be interpreted as a `null`
-reference. An `ArgumentConversionException` is thrown if the target type of a `null`
-reference is a primitive type.
+The following listing shows the generated display names for the first two parameterized
+test methods above.
+
+----
+[1] country=Sweden, reference=1
+[2] country=Poland, reference=2
+[3] country=United States of America, reference=3
+[4] country=France, reference=700_000
+----
+
+The following listing shows the generated display names for the last parameterized test
+method above that uses CSV header names.
+
+----
+[1] COUNTRY = Sweden, REFERENCE = 1
+[2] COUNTRY = Poland, REFERENCE = 2
+[3] COUNTRY = United States of America, REFERENCE = 3
+[4] COUNTRY = France, REFERENCE = 700_000
+----
+
+In contrast to the default syntax used in `@CsvSource`, `@CsvFileSource` uses a double
+quote (`+++"+++`) as the quote character by default, but this can be changed via the
+`quoteCharacter` attribute. See the `"United States of America"` value in the example
+above. An empty, quoted value (`+++""+++`) results in an empty `String` unless the
+`emptyValue` attribute is set; whereas, an entirely _empty_ value is interpreted as a
+`null` reference. By specifying one or more `nullValues`, a custom value can be
+interpreted as a `null` reference. An `ArgumentConversionException` is thrown if the
+target type of a `null` reference is a primitive type.
 
 NOTE: An _unquoted_ empty value will always be converted to a `null` reference regardless
 of any custom values configured via the `nullValues` attribute.
 
-Unless it starts with a quote character, leading and trailing whitespaces of a
-CSV column are trimmed by default. This behavior can be changed by setting the
+Except within a quoted string, leading and trailing whitespace in a CSV column is trimmed
+by default. This behavior can be changed by setting the
 `ignoreLeadingAndTrailingWhitespace` attribute to `true`.
 
 [[writing-tests-parameterized-tests-sources-ArgumentsSource]]
@@ -1624,7 +1830,8 @@ Display name of container ✔
 └─ 3 ==> the rank of 'lemon, lime' is 3 ✔
 ....
 
-Please note that `name` is a `MessageFormat` pattern. Thus, a single quote (`'`) needs to be represented as a doubled single quote (`''`) in order to be displayed.
+Please note that `name` is a `MessageFormat` pattern. Thus, a single quote (`'`) needs to
+be represented as a doubled single quote (`''`) in order to be displayed.
 
 The following placeholders are supported within custom display names.
 
@@ -1644,9 +1851,9 @@ if they exceed the configured maximum length. The limit is configurable via the
 `junit.jupiter.params.displayname.argument.maxlength` configuration parameter and defaults
 to 512 characters.
 
-When using `@MethodSource` or `@ArgumentSource`, you can give names to arguments. This
-name will be used if the argument is included in the invocation display name, like in
-the example below.
+When using `@MethodSource` or `@ArgumentsSource`, you can provide custom names for
+arguments using the `{Named}` API. A custom name will be used if the argument is included
+in the invocation display name, like in the example below.
 
 [source,java,indent=0]
 ----
@@ -1659,18 +1866,21 @@ A parameterized test with named arguments ✔
 └─ 2: Another file ✔
 ....
 
-If you'd like to set default name pattern for all parameterized tests in your project, you can add the following
-configuration to `junit-platform.properties`
+If you'd like to set a default name pattern for all parameterized tests in your project,
+you can declare the `junit.jupiter.params.displayname.default` configuration parameter in
+the `junit-platform.properties` file as demonstrated in the following example (see
+<<running-tests-config-params>> for other options).
 
 [source,properties,indent=0]
 ----
 junit.jupiter.params.displayname.default = {index}
 ----
 
-the display name for a parameterized method is determined according to the following precedence rules:
+The display name for a parameterized test is determined according to the following
+precedence rules:
 
-1. `name` of `@ParameterizedTest`, if present
-2. the value of `junit.jupiter.params.displayname.default` (from junit-platform.properties), if present
+1. `name` attribute in `@ParameterizedTest`, if present
+2. value of the `junit.jupiter.params.displayname.default` configuration parameter, if present
 3. `DEFAULT_DISPLAY_NAME` constant defined in `@ParameterizedTest`
 
 [[writing-tests-parameterized-tests-lifecycle-interop]]
@@ -1766,12 +1976,11 @@ and dynamic tests.
 The first method returns an invalid return type. Since an invalid return type cannot be
 detected at compile time, a `JUnitException` is thrown when it is detected at runtime.
 
-The next six methods are very simple examples that demonstrate the generation of a
-`Collection`, `Iterable`, `Iterator`, array, or `Stream` of `DynamicTest` instances. Most of
-these examples do not really exhibit dynamic behavior but merely demonstrate the
-supported return types in principle. However, `dynamicTestsFromStream()` and
-`dynamicTestsFromIntStream()` demonstrate how easy it is to generate dynamic tests for a
-given set of strings or a range of input numbers.
+The next six methods demonstrate the generation of a `Collection`, `Iterable`, `Iterator`,
+array, or `Stream` of `DynamicTest` instances. Most of these examples do not really
+exhibit dynamic behavior but merely demonstrate the supported return types in principle.
+However, `dynamicTestsFromStream()` and `dynamicTestsFromIntStream()` demonstrate how to
+generate dynamic tests for a given set of strings or a range of input numbers.
 
 The next method is truly dynamic in nature. `generateRandomNumberOfTests()` implements an
 `Iterator` that generates random numbers, a display name generator, and a test executor
@@ -1821,6 +2030,10 @@ implementations.
   refer to the Javadoc for `DiscoverySelectors.selectMethod(String)` for the supported
   formats for a FQMN.
 
+`ClassSource` ::
+  If the `URI` contains the `class` scheme and the fully qualified class name --
+  for example, `class:org.junit.Foo?line=42`.
+
 `UriSource` ::
   If none of the above `TestSource` implementations are applicable.
 
@@ -1839,12 +2052,6 @@ The following example shows how `@Timeout` is applied to lifecycle and test meth
 include::{testDir}/example/TimeoutDemo.java[tags=user_guide]
 ----
 
-Contrary to the `assertTimeoutPreemptively()` assertion, the execution of the annotated
-method proceeds in the main thread of the test. If the timeout is exceeded, the main
-thread is interrupted from another thread. This is done to ensure interoperability with
-frameworks such as Spring that make use of mechanisms that are sensitive to the currently
-running thread — for example, `ThreadLocal` transaction management.
-
 To apply the same timeout to all test methods within a test class and all of its `@Nested`
 classes, you can declare the `@Timeout` annotation at the class level. It will then be
 applied to all test, test factory, and test template methods within that class and its
@@ -1860,8 +2067,32 @@ within the specified duration but does not verify the execution time of each ind
 If `@Timeout` is present on a `@TestTemplate` method — for example, a `@RepeatedTest` or
 `@ParameterizedTest` — each invocation will have the given timeout applied to it.
 
+[[writing-tests-declarative-timeouts-thread-mode]]
+==== Thread mode
+
+The timeout can be applied using one of the following three thread modes: `SAME_THREAD`,
+`SEPARATE_THREAD`, or `INFERRED`.
+
+When `SAME_THREAD` is used, the execution of the annotated method proceeds in the main
+thread of the test. If the timeout is exceeded, the main thread is interrupted from
+another thread. This is done to ensure interoperability with frameworks such as Spring
+that make use of mechanisms that are sensitive to the currently running thread — for
+example, `ThreadLocal` transaction management.
+
+On the contrary when `SEPARATE_THREAD` is used, like the `assertTimeoutPreemptively()`
+assertion, the execution of the annotated method proceeds in a separate thread, this
+can lead to undesirable side effects, see <<writing-tests-assertions-preemptive-timeouts>>.
+
+When `INFERRED` (default) thread mode is used, the thread mode is resolved via the
+`junit.jupiter.execution.timeout.thread.mode.default` configuration parameter. If the
+provided configuration parameter is invalid or not present then `SAME_THREAD` is used as
+fallback.
+
+[[writing-tests-declarative-timeouts-default-timeouts]]
+==== Default Timeouts
+
 The following <<running-tests-config-params, configuration parameters>> can be used to
-specify global timeouts for all methods of a certain category unless they or an enclosing
+specify default timeouts for all methods of a certain category unless they or an enclosing
 test class is annotated with `@Timeout`:
 
 `junit.jupiter.execution.timeout.default`::
@@ -1946,7 +2177,8 @@ JUnit Jupiter supports the `junit.jupiter.execution.timeout.mode` configuration 
 to configure when timeouts are applied. There are three modes: `enabled`, `disabled`,
 and `disabled_on_debug`. The default mode is `enabled`.
 A VM runtime is considered to run in debug mode when one of its input parameters starts
-with `-agentlib:jdwp`. This heuristic is queried by the `disabled_on_debug` mode.
+with `-agentlib:jdwp` or `-Xrunjdwp`.
+This heuristic is queried by the `disabled_on_debug` mode.
 
 
 [[writing-tests-parallel-execution]]
@@ -1991,11 +2223,11 @@ junit.jupiter.execution.parallel.mode.default = concurrent
 
 The default execution mode is applied to all nodes of the test tree with a few notable
 exceptions, namely test classes that use the `Lifecycle.PER_CLASS` mode or a
-`{MethodOrderer}` (except for `{Random}`). In the former case, test authors have to
-ensure that the test class is thread-safe; in the latter, concurrent execution might
-conflict with the configured execution order. Thus, in both cases, test methods in such
-test classes are only executed concurrently if the `@Execution(CONCURRENT)` annotation is
-present on the test class or method.
+`{MethodOrderer}` (except for `{MethodOrderer_Random}`). In the former case, test authors
+have to ensure that the test class is thread-safe; in the latter, concurrent execution
+might conflict with the configured execution order. Thus, in both cases, test methods in
+such test classes are only executed concurrently if the `@Execution(CONCURRENT)`
+annotation is present on the test class or method.
 
 All nodes of the test tree that are configured with the `CONCURRENT` execution mode will
 be executed fully in parallel according to the provided
@@ -2107,6 +2339,63 @@ behind the scenes may spawn additional threads to ensure execution continues wit
 sufficient parallelism. Thus, if you require such guarantees in a test class, please use
 your own means of controlling concurrency.
 
+[[writing-tests-parallel-execution-config-properties]]
+===== Relevant properties
+
+The following table lists relevant properties for configuring parallel execution. See
+<<running-tests-config-params>> for details on how to set such properties.
+
+[cols="d,d,a,d"]
+|===
+|Property |Description |Supported Values |Default Value
+
+| ```junit.jupiter.execution.parallel.enabled```
+| Enable parallel test execution
+|
+  * `true`
+  * `false`
+| ```false```
+
+| ```junit.jupiter.execution.parallel.mode.default```
+| Default execution mode of nodes in the test tree
+|
+  * `concurrent`
+  * `same_thread`
+| ```same_thread```
+
+| ```junit.jupiter.execution.parallel.mode.classes.default```
+| Default execution mode of top-level classes
+|
+  * `concurrent`
+  * `same_thread`
+| ```same_thread```
+
+| ```junit.jupiter.execution.parallel.config.strategy```
+| Execution strategy for desired parallelism and maximum pool size
+|
+  * `dynamic`
+  * `fixed`
+  * `custom`
+| ```dynamic```
+
+| ```junit.jupiter.execution.parallel.config.dynamic.factor```
+| Factor to be multiplied by the number of available processors/cores to determine the
+  desired parallelism for the ```dynamic``` configuration strategy
+| a positive decimal number
+| ```1.0```
+
+| ```junit.jupiter.execution.parallel.config.fixed.parallelism```
+| Desired parallelism for the ```fixed``` configuration strategy
+| a positive integer
+| no default value
+
+| ```junit.jupiter.execution.parallel.config.custom.class```
+| Fully qualified class name of the _ParallelExecutionConfigurationStrategy_ to be
+  used for the ```custom``` configuration strategy
+| for example, _org.example.CustomStrategy_
+| no default value
+|===
+
 [[writing-tests-parallel-execution-synchronization]]
 ==== Synchronization
 
@@ -2164,7 +2453,7 @@ can improve and eventually <<api-evolution, promote>> this feature.
 
 The built-in `{TempDirectory}` extension is used to create and clean up a temporary
 directory for an individual test or all tests in a test class. It is registered by
-default. To use it, annotate a non-private field of type `java.nio.file.Path` or
+default. To use it, annotate a non-final, unassigned field of type `java.nio.file.Path` or
 `java.io.File` with `{TempDir}` or add a parameter of type `java.nio.file.Path` or
 `java.io.File` annotated with `@TempDir` to a lifecycle method or test method.
 
@@ -2178,16 +2467,45 @@ its content.
 include::{testDir}/example/TempDirectoryDemo.java[tags=user_guide_parameter_injection]
 ----
 
-WARNING: `@TempDir` is not supported on constructor parameters. If you wish to retain a
-single reference to a temp directory across lifecycle methods and the current test method,
-please use field injection, by annotating a non-private instance field with `@TempDir`.
+You can inject multiple temporary directories by specifying multiple annotated parameters.
+
+[source,java,indent=0]
+.A test method that requires multiple temporary directories
+----
+include::{testDir}/example/TempDirectoryDemo.java[tags=user_guide_multiple_directories]
+----
+
+WARNING: To revert to the old behavior of using a single temporary directory for the
+entire test class or method (depending on which level the annotation is used), you can set
+the `junit.jupiter.tempdir.scope` configuration parameter to `per_context`. However,
+please note that this option is deprecated and will be removed in a future release.
+
+`@TempDir` is not supported on constructor parameters. If you wish to retain a single
+reference to a temp directory across lifecycle methods and the current test method, please
+use field injection by annotating an instance field with `@TempDir`.
 
 The following example stores a _shared_ temporary directory in a `static` field. This
 allows the same `sharedTempDir` to be used in all lifecycle methods and test methods of
-the test class.
+the test class. For better isolation, you should use an instance field so that each test
+method uses a separate directory.
 
 [source,java,indent=0]
 .A test class that shares a temporary directory across test methods
 ----
 include::{testDir}/example/TempDirectoryDemo.java[tags=user_guide_field_injection]
+----
+
+The `@TempDir` annotation has an optional `cleanup` attribute that can be set to either
+`NEVER`, `ON_SUCCESS`, or `ALWAYS`. If the cleanup mode is set to `NEVER`, temporary
+directories are not deleted after a test completes. If it is set to `ON_SUCCESS`,
+temporary directories are deleted only after a test completed successfully.
+
+The default cleanup mode is `ALWAYS`. You can use the
+`junit.jupiter.tempdir.cleanup.mode.default`
+<<running-tests-config-params, configuration parameter>> to override this default.
+
+[source,java,indent=0]
+.A test class with a temporary directory that doesn't get cleaned up
+----
+include::{testDir}/example/TempDirCleanupModeDemo.java[tags=user_guide]
 ----

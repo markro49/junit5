@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2021 the original author or authors.
+ * Copyright 2015-2022 the original author or authors.
  *
  * All rights reserved. This program and the accompanying materials are
  * made available under the terms of the Eclipse Public License v2.0 which
@@ -22,8 +22,9 @@ import org.apiguardian.api.API;
 import org.apiguardian.api.API.Status;
 
 /**
- * {@code @SelectClasspathResource} specifies the classpath resource to
- * <em>select</em> when running a test suite on the JUnit Platform.
+ * {@code @SelectClasspathResource} is a {@linkplain Repeatable repeatable}
+ * annotation that specifies a classpath resource to <em>select</em> when running
+ * a test suite on the JUnit Platform.
  *
  * @since 1.8
  * @see Suite
@@ -39,18 +40,19 @@ import org.apiguardian.api.API.Status;
 public @interface SelectClasspathResource {
 
 	/**
-	 * A classpath resource name to select.
+	 * The name of the classpath resource to select.
 	 */
 	String value();
 
 	/**
-	 * The line number; ignored if not greater than zero.
+	 * The line number within the classpath resource; ignored if not greater than
+	 * zero.
 	 */
 	int line() default 0;
 
 	/**
-	 * The column number; ignored if the line number is ignored; ignored if not
-	 * greater than zero.
+	 * The column number within the classpath resource; ignored if the line number
+	 * is ignored or if not greater than zero.
 	 */
 	int column() default 0;
 

@@ -8,15 +8,29 @@ plugins {
 description = "JUnit Platform Console"
 
 dependencies {
-	api(platform(projects.bom))
-	api(libs.apiguardian)
-	api(projects.platform.reporting)
+	api(platform(projects.junitBom))
+	api(projects.junitPlatformReporting)
+
+	compileOnlyApi(libs.apiguardian)
+
+	compileOnly(libs.openTestReporting.events)
 
 	shadowed(libs.picocli)
+
+	osgiVerification(projects.junitJupiterEngine)
+	osgiVerification(projects.junitPlatformLauncher)
 }
 
 tasks {
+	compileModule {
+		options.compilerArgs.addAll(listOf(
+			"--add-modules", "org.opentest4j.reporting.events",
+			"--add-reads", "org.junit.platform.reporting=org.opentest4j.reporting.events"
+		))
+	}
 	shadowJar {
+		val release17ClassesDir = sourceSets.mainRelease17.get().output.classesDirs.singleFile
+		inputs.dir(release17ClassesDir).withPathSensitivity(PathSensitivity.RELATIVE)
 		exclude("META-INF/versions/9/module-info.class")
 		relocate("picocli", "org.junit.platform.console.shadow.picocli")
 		from(projectDir) {
@@ -31,7 +45,9 @@ tasks {
 				args(
 					"--update",
 					"--file", archiveFile.get().asFile.absolutePath,
-					"--main-class", "org.junit.platform.console.ConsoleLauncher"
+					"--main-class", "org.junit.platform.console.ConsoleLauncher",
+					"--release", "17",
+					"-C", release17ClassesDir.absolutePath, "."
 				)
 			}
 		}
@@ -48,5 +64,12 @@ tasks {
 	// So in order to resolve this, it can only run on Java 9
 	osgiProperties {
 		property("-runee", "JavaSE-9")
+	}
+}
+
+eclipse {
+	classpath {
+		sourceSets -= project.sourceSets.mainRelease9.get()
+		sourceSets -= project.sourceSets.mainRelease17.get()
 	}
 }

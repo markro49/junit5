@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2021 the original author or authors.
+ * Copyright 2015-2022 the original author or authors.
  *
  * All rights reserved. This program and the accompanying materials are
  * made available under the terms of the Eclipse Public License v2.0 which
@@ -141,6 +141,32 @@ class AnnotationUtilsTests {
 	void findAnnotationMetaPresentOnOptionalMethod() throws Exception {
 		var method = ComposedAnnotationClass.class.getDeclaredMethod("method");
 		assertThat(findAnnotation(Optional.of(method), Annotation1.class)).isPresent();
+	}
+
+	@Test
+	void findAnnotationDirectlyPresentOnEnclosingClass() throws Exception {
+		Class<?> clazz = Annotation1Class.InnerClass.class;
+		assertThat(findAnnotation(clazz, Annotation1.class, false)).isNotPresent();
+		assertThat(findAnnotation(clazz, Annotation1.class, true)).isPresent();
+
+		clazz = Annotation1Class.InnerClass.InnerInnerClass.class;
+		assertThat(findAnnotation(clazz, Annotation1.class, false)).isNotPresent();
+		assertThat(findAnnotation(clazz, Annotation1.class, true)).isPresent();
+
+		clazz = Annotation1Class.NestedClass.class;
+		assertThat(findAnnotation(clazz, Annotation1.class, false)).isNotPresent();
+		assertThat(findAnnotation(clazz, Annotation1.class, true)).isNotPresent();
+	}
+
+	@Test
+	void findAnnotationMetaPresentOnEnclosingClass() throws Exception {
+		Class<?> clazz = ComposedAnnotationClass.InnerClass.class;
+		assertThat(findAnnotation(clazz, Annotation1.class, false)).isNotPresent();
+		assertThat(findAnnotation(clazz, Annotation1.class, true)).isPresent();
+
+		clazz = ComposedAnnotationClass.InnerClass.InnerInnerClass.class;
+		assertThat(findAnnotation(clazz, Annotation1.class, false)).isNotPresent();
+		assertThat(findAnnotation(clazz, Annotation1.class, true)).isPresent();
 	}
 
 	@Test
@@ -655,6 +681,12 @@ class AnnotationUtilsTests {
 
 	@Annotation1
 	static class Annotation1Class {
+		class InnerClass {
+			class InnerInnerClass {
+			}
+		}
+		static class NestedClass {
+		}
 	}
 
 	@Annotation2
@@ -677,6 +709,11 @@ class AnnotationUtilsTests {
 
 		@ComposedAnnotation
 		void method() {
+		}
+
+		class InnerClass {
+			class InnerInnerClass {
+			}
 		}
 	}
 

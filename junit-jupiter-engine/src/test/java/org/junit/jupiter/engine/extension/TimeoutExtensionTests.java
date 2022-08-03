@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2021 the original author or authors.
+ * Copyright 2015-2022 the original author or authors.
  *
  * All rights reserved. This program and the accompanying materials are
  * made available under the terms of the Eclipse Public License v2.0 which
@@ -12,10 +12,13 @@ package org.junit.jupiter.engine.extension;
 
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.NANOSECONDS;
+import static java.util.concurrent.TimeUnit.SECONDS;
 import static java.util.stream.Collectors.toList;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.DynamicTest.dynamicTest;
+import static org.junit.jupiter.api.Timeout.ThreadMode.SAME_THREAD;
+import static org.junit.jupiter.api.Timeout.ThreadMode.SEPARATE_THREAD;
 import static org.junit.jupiter.engine.Constants.DEFAULT_AFTER_ALL_METHOD_TIMEOUT_PROPERTY_NAME;
 import static org.junit.jupiter.engine.Constants.DEFAULT_AFTER_EACH_METHOD_TIMEOUT_PROPERTY_NAME;
 import static org.junit.jupiter.engine.Constants.DEFAULT_BEFORE_ALL_METHOD_TIMEOUT_PROPERTY_NAME;
@@ -32,6 +35,7 @@ import static org.junit.platform.launcher.core.LauncherDiscoveryRequestBuilder.r
 
 import java.time.Duration;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Stream;
 
@@ -41,14 +45,18 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.DynamicTest;
+import org.junit.jupiter.api.MethodOrderer.OrderAnnotation;
 import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.RepeatedTest;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestFactory;
+import org.junit.jupiter.api.TestMethodOrder;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.engine.AbstractJupiterTestEngineTests;
 import org.junit.platform.commons.PreconditionViolationException;
 import org.junit.platform.commons.util.RuntimeUtils;
+import org.junit.platform.engine.TestExecutionResult.Status;
 import org.junit.platform.testkit.engine.EngineExecutionResults;
 import org.junit.platform.testkit.engine.Events;
 import org.junit.platform.testkit.engine.Execution;
@@ -273,6 +281,7 @@ class TimeoutExtensionTests extends AbstractJupiterTestEngineTests {
 			DEFAULT_AFTER_EACH_METHOD_TIMEOUT_PROPERTY_NAME, "afterEach()", //
 			DEFAULT_AFTER_ALL_METHOD_TIMEOUT_PROPERTY_NAME, "afterAll()" //
 		).entrySet().stream().map(entry -> dynamicTest("uses " + entry.getKey() + " config param", () -> {
+			PlainTestCase.slowMethod = entry.getValue();
 			EngineExecutionResults results = executeTests(request() //
 					.selectors(selectClass(PlainTestCase.class)) //
 					.configurationParameter(entry.getKey(), "1ns") //
@@ -328,6 +337,146 @@ class TimeoutExtensionTests extends AbstractJupiterTestEngineTests {
 				.executions() //
 				.filter(execution -> execution.getTestDescriptor().getDisplayName().contains(displayName)) //
 				.collect(toList()));
+	}
+
+	@Nested
+	@DisplayName("separate thread")
+	class SeparateThread {
+		@Test
+		@DisplayName("timeout exceeded")
+		void timeoutExceededInSeparateThread() {
+			EngineExecutionResults results = executeTestsForClass(TimeoutExceedingSeparateThreadTestCase.class);
+
+			Execution execution = findExecution(results.testEvents(), "testMethod()");
+			assertThat(execution.getTerminationInfo().getExecutionResult().getThrowable().orElseThrow()) //
+					.isInstanceOf(TimeoutException.class) //
+					.hasMessage("testMethod() timed out after 10 milliseconds");
+		}
+
+		@Test
+		@DisplayName("non timeout exceeded")
+		void nonTimeoutExceededInSeparateThread() {
+			executeTestsForClass(NonTimeoutExceedingSeparateThreadTestCase.class).allEvents() //
+					.assertStatistics(stats -> stats.failed(0));
+		}
+
+		@Test
+		@DisplayName("does not swallow unrecoverable exceptions")
+		void separateThreadDoesNotSwallowUnrecoverableExceptions() {
+			assertThrows(OutOfMemoryError.class,
+				() -> executeTestsForClass(UnrecoverableExceptionInSeparateThreadTestCase.class));
+		}
+
+		@Test
+		@DisplayName("handles invocation exceptions")
+		void separateThreadHandlesInvocationExceptions() {
+			EngineExecutionResults results = executeTests(request() //
+					.selectors(selectMethod(ExceptionInSeparateThreadTestCase.class, "test")) //
+					.build());
+
+			Execution execution = findExecution(results.testEvents(), "test()");
+			assertThat(execution.getDuration()) //
+					.isLessThanOrEqualTo(Duration.ofMillis(10));
+			assertThat(execution.getTerminationInfo().getExecutionResult().getThrowable().orElseThrow()) //
+					.isInstanceOf(RuntimeException.class) //
+					.hasMessage("Oppps!");
+		}
+
+		@Test
+		@DisplayName("when one test is stuck \"forever\" the next tests should not get stuck")
+		void oneThreadStuckForever() {
+			EngineExecutionResults results = executeTestsForClass(OneTestStuckForeverAndTheOthersNotTestCase.class);
+
+			results.allEvents().debug();
+
+			Execution stuckExecution = findExecution(results.testEvents(), "stuck()");
+			assertThat(stuckExecution.getTerminationInfo().getExecutionResult().getThrowable().orElseThrow()) //
+					.isInstanceOf(TimeoutException.class) //
+					.hasMessage("stuck() timed out after 10 milliseconds");
+
+			Execution testZeroExecution = findExecution(results.testEvents(), "testZero()");
+			assertThat(testZeroExecution.getTerminationInfo().getExecutionResult().getStatus()) //
+					.isEqualTo(Status.SUCCESSFUL);
+
+			Execution testOneExecution = findExecution(results.testEvents(), "testOne()");
+			assertThat(testOneExecution.getTerminationInfo().getExecutionResult().getStatus()) //
+					.isEqualTo(Status.SUCCESSFUL);
+		}
+
+		@Test
+		@DisplayName("mixed same thread and separate thread tests")
+		void mixedSameThreadAndSeparateThreadTests() {
+			EngineExecutionResults results = executeTestsForClass(MixedSameThreadAndSeparateThreadTestCase.class);
+
+			Execution stuck = findExecution(results.testEvents(), "testZero()");
+			assertThat(stuck.getTerminationInfo().getExecutionResult().getThrowable().orElseThrow()) //
+					.isInstanceOf(TimeoutException.class) //
+					.hasMessage("testZero() timed out after 10 milliseconds");
+
+			Execution testZeroExecution = findExecution(results.testEvents(), "testOne()");
+			assertThat(testZeroExecution.getTerminationInfo().getExecutionResult().getThrowable().orElseThrow()) //
+					.isInstanceOf(TimeoutException.class) //
+					.hasMessage("testOne() timed out after 10 milliseconds");
+
+			Execution testOneExecution = findExecution(results.testEvents(), "testTwo()");
+			assertThat(testOneExecution.getTerminationInfo().getExecutionResult().getThrowable().orElseThrow()) //
+					.isInstanceOf(TimeoutException.class) //
+					.hasMessage("testTwo() timed out after 10 milliseconds");
+		}
+
+		@Test
+		@DisplayName("one test is stuck \"forever\" in separate thread and other tests in same thread not")
+		void oneThreadStuckForeverAndOtherTestsInSameThread() {
+			EngineExecutionResults results = executeTestsForClass(
+				OneTestStuckForeverAndTheOthersInSameThreadNotTestCase.class);
+
+			Execution stuckExecution = findExecution(results.testEvents(), "stuck()");
+			assertThat(stuckExecution.getTerminationInfo().getExecutionResult().getThrowable().orElseThrow()) //
+					.isInstanceOf(TimeoutException.class) //
+					.hasMessage("stuck() timed out after 10 milliseconds");
+
+			Execution testZeroExecution = findExecution(results.testEvents(), "testZero()");
+			assertThat(testZeroExecution.getTerminationInfo().getExecutionResult().getStatus()) //
+					.isEqualTo(Status.SUCCESSFUL);
+
+			Execution testOneExecution = findExecution(results.testEvents(), "testOne()");
+			assertThat(testOneExecution.getTerminationInfo().getExecutionResult().getStatus()) //
+					.isEqualTo(Status.SUCCESSFUL);
+		}
+
+		@Test
+		@DisplayName("is not applied on annotated @Test methods using timeout mode: disabled")
+		void doesNotApplyTimeoutOnAnnotatedTestMethodsUsingDisabledTimeoutMode() {
+			EngineExecutionResults results = executeTests(request() //
+					.selectors(selectMethod(TimeoutExceedingSeparateThreadTestCase.class, "testMethod")) //
+					.configurationParameter(TIMEOUT_MODE_PROPERTY_NAME, "disabled").build());
+
+			Execution execution = findExecution(results.testEvents(), "testMethod()");
+			assertThat(execution.getTerminationInfo().getExecutionResult().getThrowable()) //
+					.isEmpty();
+		}
+
+		@Nested
+		@DisplayName("on class level")
+		class OnClassLevel {
+			@Test
+			@DisplayName("timeout exceeded")
+			void timeoutExceededInSeparateThreadOnClassLevel() {
+				EngineExecutionResults results = executeTestsForClass(TimeoutExceededOnClassLevelTestCase.class);
+
+				Execution execution = findExecution(results.testEvents(), "exceptionThrown()");
+				assertThat(execution.getTerminationInfo().getExecutionResult().getThrowable().orElseThrow()) //
+						.isInstanceOf(TimeoutException.class) //
+						.hasMessage("exceptionThrown() timed out after 100 milliseconds");
+			}
+
+			@Test
+			@DisplayName("non timeout exceeded")
+			void nonTimeoutExceededInSeparateThreadOnClassLevel() {
+				executeTestsForClass(NonTimeoutExceededOnClassLevelTestCase.class).allEvents() //
+						.assertStatistics(stats -> stats.failed(0));
+			}
+		}
 	}
 
 	static class TimeoutAnnotatedTestMethodTestCase {
@@ -437,40 +586,49 @@ class TimeoutExtensionTests extends AbstractJupiterTestEngineTests {
 	}
 
 	static class PlainTestCase {
+
+		public static String slowMethod;
+
 		@BeforeAll
 		static void beforeAll() throws Exception {
-			Thread.sleep(10);
+			waitForInterrupt("beforeAll()");
 		}
 
 		@BeforeEach
 		void beforeEach() throws Exception {
-			Thread.sleep(10);
+			waitForInterrupt("beforeEach()");
 		}
 
 		@Test
 		void test() throws Exception {
-			Thread.sleep(10);
+			waitForInterrupt("test()");
 		}
 
 		@RepeatedTest(2)
 		void testTemplate() throws Exception {
-			Thread.sleep(10);
+			waitForInterrupt("testTemplate()");
 		}
 
 		@TestFactory
 		Stream<DynamicTest> testFactory() throws Exception {
-			Thread.sleep(10);
+			waitForInterrupt("testFactory()");
 			return Stream.empty();
 		}
 
 		@AfterEach
 		void afterEach() throws Exception {
-			Thread.sleep(10);
+			waitForInterrupt("afterEach()");
 		}
 
 		@AfterAll
 		static void afterAll() throws Exception {
-			Thread.sleep(10);
+			waitForInterrupt("afterAll()");
+		}
+
+		private static void waitForInterrupt(String methodName) throws InterruptedException {
+			if (methodName.equals(slowMethod)) {
+				blockUntilInterrupted();
+			}
 		}
 	}
 
@@ -532,4 +690,127 @@ class TimeoutExtensionTests extends AbstractJupiterTestEngineTests {
 
 	}
 
+	static class TimeoutExceedingWithInferredThreadModeTestCase {
+		@Test
+		@Timeout(value = 10, unit = MILLISECONDS)
+		void testMethod() throws InterruptedException {
+			Thread.sleep(1000);
+		}
+	}
+
+	static class TimeoutExceedingSeparateThreadTestCase {
+		@Test
+		@Timeout(value = 10, unit = MILLISECONDS, threadMode = SEPARATE_THREAD)
+		void testMethod() throws InterruptedException {
+			Thread.sleep(1000);
+		}
+	}
+
+	static class NonTimeoutExceedingSeparateThreadTestCase {
+		@Test
+		@Timeout(value = 100, unit = MILLISECONDS, threadMode = SEPARATE_THREAD)
+		void testMethod() {
+		}
+	}
+
+	static class UnrecoverableExceptionInSeparateThreadTestCase {
+		@Test
+		@Timeout(value = 100, unit = SECONDS, threadMode = SEPARATE_THREAD)
+		void test() {
+			throw new OutOfMemoryError();
+		}
+	}
+
+	static class ExceptionInSeparateThreadTestCase {
+		@Test
+		@Timeout(value = 100, unit = MILLISECONDS, threadMode = SEPARATE_THREAD)
+		void test() {
+			throw new RuntimeException("Oppps!");
+		}
+	}
+
+	@Timeout(value = 100, unit = MILLISECONDS, threadMode = SEPARATE_THREAD)
+	static class TimeoutExceededOnClassLevelTestCase {
+		@Test
+		void exceptionThrown() throws InterruptedException {
+			Thread.sleep(1000);
+		}
+	}
+
+	@Timeout(value = 100, unit = MILLISECONDS, threadMode = SEPARATE_THREAD)
+	static class NonTimeoutExceededOnClassLevelTestCase {
+		@Test
+		void test() {
+		}
+	}
+
+	@TestMethodOrder(OrderAnnotation.class)
+	static class OneTestStuckForeverAndTheOthersNotTestCase {
+
+		@Test
+		@Order(0)
+		@Timeout(value = 10, unit = MILLISECONDS, threadMode = SEPARATE_THREAD)
+		void stuck() throws InterruptedException {
+			blockUntilInterrupted();
+		}
+
+		@Test
+		@Order(1)
+		@Timeout(value = 100, unit = MILLISECONDS, threadMode = SEPARATE_THREAD)
+		void testZero() {
+		}
+
+		@Test
+		@Order(2)
+		@Timeout(value = 100, unit = MILLISECONDS, threadMode = SEPARATE_THREAD)
+		void testOne() {
+		}
+	}
+
+	static class MixedSameThreadAndSeparateThreadTestCase {
+		@Test
+		@Timeout(value = 10, unit = MILLISECONDS, threadMode = SEPARATE_THREAD)
+		void testZero() throws InterruptedException {
+			Thread.sleep(1000);
+		}
+
+		@Test
+		@Timeout(value = 10, unit = MILLISECONDS, threadMode = SAME_THREAD)
+		void testOne() throws InterruptedException {
+			Thread.sleep(1000);
+		}
+
+		@Test
+		@Timeout(value = 10, unit = MILLISECONDS, threadMode = SEPARATE_THREAD)
+		void testTwo() throws InterruptedException {
+			Thread.sleep(1000);
+		}
+	}
+
+	@TestMethodOrder(OrderAnnotation.class)
+	static class OneTestStuckForeverAndTheOthersInSameThreadNotTestCase {
+
+		@Test
+		@Order(0)
+		@Timeout(value = 10, unit = MILLISECONDS, threadMode = SEPARATE_THREAD)
+		void stuck() throws InterruptedException {
+			blockUntilInterrupted();
+		}
+
+		@Test
+		@Order(1)
+		@Timeout(value = 10, unit = MILLISECONDS, threadMode = SAME_THREAD)
+		void testZero() {
+		}
+
+		@Test
+		@Order(2)
+		@Timeout(value = 10, unit = MILLISECONDS, threadMode = SAME_THREAD)
+		void testOne() {
+		}
+	}
+
+	private static void blockUntilInterrupted() throws InterruptedException {
+		new CountDownLatch(1).await();
+	}
 }

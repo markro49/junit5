@@ -7,19 +7,37 @@ plugins {
 description = "JUnit Jupiter Params"
 
 dependencies {
-	api(platform(projects.bom))
-	api(libs.apiguardian)
-	api(projects.jupiter.api)
+	api(platform(projects.junitBom))
+	api(projects.junitJupiterApi)
+
+	compileOnlyApi(libs.apiguardian)
 
 	shadowed(libs.univocity.parsers)
 
-	testImplementation(projects.platform.testkit)
-	testImplementation(projects.jupiter.engine)
-	testImplementation(projects.platform.launcher)
-	testImplementation(projects.platform.runner)
+	testImplementation(projects.junitPlatformTestkit)
+	testImplementation(projects.junitJupiterEngine)
+	testImplementation(projects.junitPlatformLauncher)
+	testImplementation(projects.junitPlatformSuiteEngine)
+	testImplementation(testFixtures(projects.junitJupiterEngine))
 
 	compileOnly(kotlin("stdlib"))
 	testImplementation(kotlin("stdlib"))
+
+	osgiVerification(projects.junitJupiterEngine)
+	osgiVerification(projects.junitPlatformLauncher)
+}
+
+tasks {
+	jar {
+		bundle {
+			bnd("""
+				Require-Capability:\
+					org.junit.platform.engine;\
+						filter:='(&(org.junit.platform.engine=junit-jupiter)(version>=${'$'}{version_cleanup;${rootProject.property("version")!!}})(!(version>=${'$'}{versionmask;+;${'$'}{version_cleanup;${rootProject.property("version")!!}}})))';\
+						effective:=active
+			""")
+		}
+	}
 }
 
 tasks {

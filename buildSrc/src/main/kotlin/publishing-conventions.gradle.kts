@@ -1,23 +1,49 @@
 plugins {
 	`maven-publish`
 	signing
+	id("base-conventions")
 }
 
 val isSnapshot = project.version.toString().contains("SNAPSHOT")
 val isContinuousIntegrationEnvironment = System.getenv("CI")?.toBoolean() ?: false
-val isJitPackEnvironment = System.getenv("JITPACK")?.toBoolean() ?: false
+
+val jupiterProjects: List<Project> by rootProject
+val platformProjects: List<Project> by rootProject
+val vintageProjects: List<Project> by rootProject
+
+when (project) {
+	in jupiterProjects -> {
+		group = property("jupiterGroup")!!
+	}
+	in platformProjects -> {
+		group = property("platformGroup")!!
+		version = property("platformVersion")!!
+	}
+	in vintageProjects -> {
+		group = property("vintageGroup")!!
+		version = property("vintageVersion")!!
+	}
+}
 
 // ensure project is built successfully before publishing it
 tasks.withType<PublishToMavenRepository>().configureEach {
-	dependsOn(tasks.build)
+	dependsOn(provider {
+		val tempRepoName: String by rootProject
+		if (repository.name != tempRepoName) {
+			listOf(tasks.build)
+		} else {
+			emptyList()
+		}
+	})
 }
 tasks.withType<PublishToMavenLocal>().configureEach {
 	dependsOn(tasks.build)
 }
 
 signing {
+	useGpgCmd()
 	sign(publishing.publications)
-	isRequired = !(isSnapshot || isContinuousIntegrationEnvironment || isJitPackEnvironment)
+	isRequired = !(isSnapshot || isContinuousIntegrationEnvironment)
 }
 
 tasks.withType<Sign>().configureEach {

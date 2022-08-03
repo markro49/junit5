@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2021 the original author or authors.
+ * Copyright 2015-2022 the original author or authors.
  *
  * All rights reserved. This program and the accompanying materials are
  * made available under the terms of the Eclipse Public License v2.0 which
@@ -10,7 +10,9 @@
 
 package org.junit.platform.commons.util;
 
+import static java.time.Duration.ofMillis;
 import static java.util.Arrays.stream;
+import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toList;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
@@ -18,6 +20,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.platform.commons.function.Try.success;
 import static org.junit.platform.commons.util.ReflectionUtils.HierarchyTraversalMode.BOTTOM_UP;
@@ -45,7 +48,10 @@ import java.util.Map;
 import java.util.function.Predicate;
 import java.util.logging.Level;
 import java.util.logging.LogRecord;
+import java.util.stream.IntStream;
+import java.util.stream.Stream;
 
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.fixtures.TrackLogRecords;
 import org.junit.jupiter.api.io.TempDir;
@@ -279,47 +285,136 @@ class ReflectionUtilsTests {
 		assertThrows(PreconditionViolationException.class, () -> tryToReadFieldValue(field, null).get());
 	}
 
-	@Test
-	void isAssignableToForNullClass() {
-		assertThrows(PreconditionViolationException.class, () -> ReflectionUtils.isAssignableTo(new Object(), null));
+	@Nested
+	class IsClassAssignableToClassTests {
+
+		@Test
+		void isAssignableToForNullSourceType() {
+			assertThatExceptionOfType(PreconditionViolationException.class)//
+					.isThrownBy(() -> ReflectionUtils.isAssignableTo(null, getClass()))//
+					.withMessage("source type must not be null");
+		}
+
+		@Test
+		void isAssignableToForPrimitiveSourceType() {
+			assertThatExceptionOfType(PreconditionViolationException.class)//
+					.isThrownBy(() -> ReflectionUtils.isAssignableTo(int.class, Integer.class))//
+					.withMessage("source type must not be a primitive type");
+		}
+
+		@Test
+		void isAssignableToForNullTargetType() {
+			assertThatExceptionOfType(PreconditionViolationException.class)//
+					.isThrownBy(() -> ReflectionUtils.isAssignableTo(getClass(), null))//
+					.withMessage("target type must not be null");
+		}
+
+		@Test
+		void isAssignableTo() {
+			// Reference Types
+			assertTrue(ReflectionUtils.isAssignableTo(String.class, Object.class));
+			assertTrue(ReflectionUtils.isAssignableTo(String.class, CharSequence.class));
+			assertTrue(ReflectionUtils.isAssignableTo(String.class, String.class));
+			assertTrue(ReflectionUtils.isAssignableTo(Integer.class, Number.class));
+			assertTrue(ReflectionUtils.isAssignableTo(Integer.class, Integer.class));
+
+			assertFalse(ReflectionUtils.isAssignableTo(Object.class, String.class));
+			assertFalse(ReflectionUtils.isAssignableTo(CharSequence.class, String.class));
+			assertFalse(ReflectionUtils.isAssignableTo(Number.class, Integer.class));
+
+			// Arrays
+			assertTrue(ReflectionUtils.isAssignableTo(int[].class, int[].class));
+			assertTrue(ReflectionUtils.isAssignableTo(double[].class, double[].class));
+			assertTrue(ReflectionUtils.isAssignableTo(double[].class, Object.class));
+			assertTrue(ReflectionUtils.isAssignableTo(String[].class, Object.class));
+			assertTrue(ReflectionUtils.isAssignableTo(String[].class, Object[].class));
+			assertTrue(ReflectionUtils.isAssignableTo(String[].class, String[].class));
+
+			// Wrappers to Primitives
+			assertTrue(ReflectionUtils.isAssignableTo(Integer.class, int.class));
+			assertTrue(ReflectionUtils.isAssignableTo(Boolean.class, boolean.class));
+
+			// Widening Conversions from Wrappers to Primitives
+			assertTrue(ReflectionUtils.isAssignableTo(Integer.class, long.class));
+			assertTrue(ReflectionUtils.isAssignableTo(Float.class, double.class));
+			assertTrue(ReflectionUtils.isAssignableTo(Byte.class, double.class));
+
+			// Widening Conversions from Wrappers to Wrappers (not supported by Java)
+			assertFalse(ReflectionUtils.isAssignableTo(Integer.class, Long.class));
+			assertFalse(ReflectionUtils.isAssignableTo(Float.class, Double.class));
+			assertFalse(ReflectionUtils.isAssignableTo(Byte.class, Double.class));
+
+			// Narrowing Conversions
+			assertFalse(ReflectionUtils.isAssignableTo(Integer.class, char.class));
+			assertFalse(ReflectionUtils.isAssignableTo(Long.class, byte.class));
+			assertFalse(ReflectionUtils.isAssignableTo(Long.class, int.class));
+		}
+
 	}
 
-	@Test
-	void isAssignableTo() {
-		// Reference Types
-		assertTrue(ReflectionUtils.isAssignableTo("string", String.class));
-		assertTrue(ReflectionUtils.isAssignableTo("string", CharSequence.class));
-		assertTrue(ReflectionUtils.isAssignableTo("string", Object.class));
+	@Nested
+	class IsObjectAssignableToClassTests {
 
-		assertFalse(ReflectionUtils.isAssignableTo(new Object(), String.class));
-		assertFalse(ReflectionUtils.isAssignableTo(Integer.valueOf("1"), StringBuilder.class));
-		assertFalse(ReflectionUtils.isAssignableTo(new StringBuilder(), String.class));
+		@Test
+		void isAssignableToForNullClass() {
+			assertThrows(PreconditionViolationException.class,
+				() -> ReflectionUtils.isAssignableTo(new Object(), null));
+		}
 
-		// Arrays
-		assertTrue(ReflectionUtils.isAssignableTo(new int[0], int[].class));
-		assertTrue(ReflectionUtils.isAssignableTo(new double[0], Object.class));
-		assertTrue(ReflectionUtils.isAssignableTo(new String[0], String[].class));
-		assertTrue(ReflectionUtils.isAssignableTo(new String[0], Object.class));
+		@Test
+		void isAssignableTo() {
+			// Reference Types
+			assertTrue(ReflectionUtils.isAssignableTo("string", String.class));
+			assertTrue(ReflectionUtils.isAssignableTo("string", CharSequence.class));
+			assertTrue(ReflectionUtils.isAssignableTo("string", Object.class));
 
-		// Primitive Types
-		assertTrue(ReflectionUtils.isAssignableTo(1, int.class));
-		assertTrue(ReflectionUtils.isAssignableTo(Long.valueOf("1"), long.class));
-		assertTrue(ReflectionUtils.isAssignableTo(Boolean.TRUE, boolean.class));
+			assertFalse(ReflectionUtils.isAssignableTo(new Object(), String.class));
+			assertFalse(ReflectionUtils.isAssignableTo(Integer.valueOf("1"), StringBuilder.class));
+			assertFalse(ReflectionUtils.isAssignableTo(new StringBuilder(), String.class));
 
-		// Widening Conversions to Primitives
-		assertTrue(ReflectionUtils.isAssignableTo(1, long.class));
-		assertTrue(ReflectionUtils.isAssignableTo(1f, double.class));
-		assertTrue(ReflectionUtils.isAssignableTo((byte) 1, double.class));
+			// Arrays
+			assertTrue(ReflectionUtils.isAssignableTo(new int[0], int[].class));
+			assertTrue(ReflectionUtils.isAssignableTo(new double[0], Object.class));
+			assertTrue(ReflectionUtils.isAssignableTo(new String[0], String[].class));
+			assertTrue(ReflectionUtils.isAssignableTo(new String[0], Object.class));
 
-		// Widening Conversions to Wrappers (not supported by Java)
-		assertFalse(ReflectionUtils.isAssignableTo(1, Long.class));
-		assertFalse(ReflectionUtils.isAssignableTo(1f, Double.class));
-		assertFalse(ReflectionUtils.isAssignableTo((byte) 1, Double.class));
+			// Primitive Types
+			assertTrue(ReflectionUtils.isAssignableTo(1, int.class));
+			assertTrue(ReflectionUtils.isAssignableTo(Long.valueOf("1"), long.class));
+			assertTrue(ReflectionUtils.isAssignableTo(Boolean.TRUE, boolean.class));
 
-		// Narrowing Conversions
-		assertFalse(ReflectionUtils.isAssignableTo(1, char.class));
-		assertFalse(ReflectionUtils.isAssignableTo(1L, byte.class));
-		assertFalse(ReflectionUtils.isAssignableTo(1L, int.class));
+			// Widening Conversions to Primitives
+			assertTrue(ReflectionUtils.isAssignableTo(1, long.class));
+			assertTrue(ReflectionUtils.isAssignableTo(1f, double.class));
+			assertTrue(ReflectionUtils.isAssignableTo((byte) 1, double.class));
+
+			// Widening Conversions to Wrappers (not supported by Java)
+			assertFalse(ReflectionUtils.isAssignableTo(1, Long.class));
+			assertFalse(ReflectionUtils.isAssignableTo(1f, Double.class));
+			assertFalse(ReflectionUtils.isAssignableTo((byte) 1, Double.class));
+
+			// Narrowing Conversions
+			assertFalse(ReflectionUtils.isAssignableTo(1, char.class));
+			assertFalse(ReflectionUtils.isAssignableTo(1L, byte.class));
+			assertFalse(ReflectionUtils.isAssignableTo(1L, int.class));
+		}
+
+		@Test
+		void isAssignableToForNullObject() {
+			assertTrue(ReflectionUtils.isAssignableTo((Object) null, Object.class));
+			assertTrue(ReflectionUtils.isAssignableTo((Object) null, String.class));
+			assertTrue(ReflectionUtils.isAssignableTo((Object) null, Long.class));
+			assertTrue(ReflectionUtils.isAssignableTo((Object) null, Character[].class));
+		}
+
+		@Test
+		void isAssignableToForNullObjectAndPrimitive() {
+			assertFalse(ReflectionUtils.isAssignableTo((Object) null, byte.class));
+			assertFalse(ReflectionUtils.isAssignableTo((Object) null, int.class));
+			assertFalse(ReflectionUtils.isAssignableTo((Object) null, long.class));
+			assertFalse(ReflectionUtils.isAssignableTo((Object) null, boolean.class));
+		}
+
 	}
 
 	@Test
@@ -390,22 +485,6 @@ class ReflectionUtilsTests {
 	}
 
 	@Test
-	void isAssignableToForNullObject() {
-		assertTrue(ReflectionUtils.isAssignableTo(null, Object.class));
-		assertTrue(ReflectionUtils.isAssignableTo(null, String.class));
-		assertTrue(ReflectionUtils.isAssignableTo(null, Long.class));
-		assertTrue(ReflectionUtils.isAssignableTo(null, Character[].class));
-	}
-
-	@Test
-	void isAssignableToForNullObjectAndPrimitive() {
-		assertFalse(ReflectionUtils.isAssignableTo(null, byte.class));
-		assertFalse(ReflectionUtils.isAssignableTo(null, int.class));
-		assertFalse(ReflectionUtils.isAssignableTo(null, long.class));
-		assertFalse(ReflectionUtils.isAssignableTo(null, boolean.class));
-	}
-
-	@Test
 	void invokeMethodPreconditions() {
 		// @formatter:off
 		assertThrows(PreconditionViolationException.class, () -> invokeMethod(null, new Object()));
@@ -460,6 +539,20 @@ class ReflectionUtilsTests {
 	void tryToLoadClassWhenClassNotFoundException() {
 		assertThrows(ClassNotFoundException.class,
 			() -> ReflectionUtils.tryToLoadClass("foo.bar.EnigmaClassThatDoesNotExist").get());
+	}
+
+	@Test
+	void tryToLoadClassFailsWithinReasonableTimeForInsanelyLargeAndInvalidMultidimensionalPrimitiveArrayName() {
+		// Create a class name of the form int[][][]...[][][]X
+		String className = IntStream.rangeClosed(1, 20_000)//
+				.mapToObj(i -> "[]")//
+				.collect(joining("", "int", "X"));
+
+		// The following should ideally fail in less than 50ms. So we just make
+		// sure it fails in less than 500ms in order to (hopefully) allow the
+		// test to pass on CI servers with limited resources.
+		assertTimeoutPreemptively(ofMillis(500),
+			() -> assertThrows(ClassNotFoundException.class, () -> ReflectionUtils.tryToLoadClass(className).get()));
 	}
 
 	@Test
@@ -713,11 +806,14 @@ class ReflectionUtilsTests {
 	 */
 	@Test
 	void findNestedClassesWithRecursiveHierarchies() {
-		assertNestedCycle(OuterClass.class, InnerClass.class, OuterClass.class);
-		assertNestedCycle(StaticNestedClass.class, InnerClass.class, OuterClass.class);
-		assertNestedCycle(RecursiveInnerClass.class, OuterClass.class);
-		assertNestedCycle(RecursiveInnerInnerClass.class, OuterClass.class);
-		assertNestedCycle(InnerClass.class, RecursiveInnerInnerClass.class, OuterClass.class);
+		Runnable runnable1 = () -> assertNestedCycle(OuterClass.class, InnerClass.class, OuterClass.class);
+		Runnable runnable2 = () -> assertNestedCycle(StaticNestedClass.class, InnerClass.class, OuterClass.class);
+		Runnable runnable3 = () -> assertNestedCycle(RecursiveInnerClass.class, OuterClass.class);
+		Runnable runnable4 = () -> assertNestedCycle(RecursiveInnerInnerClass.class, OuterClass.class);
+		Runnable runnable5 = () -> assertNestedCycle(InnerClass.class, RecursiveInnerInnerClass.class,
+			OuterClass.class);
+		Stream.of(runnable1, runnable1, runnable1, runnable2, runnable2, runnable2, runnable3, runnable3, runnable3,
+			runnable4, runnable4, runnable4, runnable5, runnable5, runnable5).parallel().forEach(Runnable::run);
 	}
 
 	private static List<Class<?>> findNestedClasses(Class<?> clazz) {

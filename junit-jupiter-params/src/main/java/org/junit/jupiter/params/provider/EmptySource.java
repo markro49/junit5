@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2021 the original author or authors.
+ * Copyright 2015-2022 the original author or authors.
  *
  * All rights reserved. This program and the accompanying materials are
  * made available under the terms of the Eclipse Public License v2.0 which
@@ -24,7 +24,7 @@ import org.apiguardian.api.API;
  * {@code @EmptySource} is an {@link ArgumentsSource} which provides a single
  * <em>empty</em> argument to the annotated {@code @ParameterizedTest} method.
  *
- * <h3>Supported Parameter Types</h3>
+ * <h2>Supported Parameter Types</h2>
  *
  * <p>This argument source will only provide an empty argument for the following
  * method parameter types. Subtypes of the supported types are not supported.

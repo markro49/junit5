@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2021 the original author or authors.
+ * Copyright 2015-2022 the original author or authors.
  *
  * All rights reserved. This program and the accompanying materials are
  * made available under the terms of the Eclipse Public License v2.0 which
@@ -17,16 +17,25 @@ import static java.util.stream.Collectors.toList;
 import static org.apiguardian.api.API.Status.INTERNAL;
 import static org.junit.platform.engine.discovery.ClassNameFilter.STANDARD_INCLUDE_PATTERN;
 
-import java.net.URI;
-import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
-import java.util.stream.Stream;
 
 import org.apiguardian.api.API;
+import org.junit.platform.engine.DiscoverySelector;
+import org.junit.platform.engine.discovery.ClassSelector;
+import org.junit.platform.engine.discovery.ClasspathResourceSelector;
+import org.junit.platform.engine.discovery.DirectorySelector;
+import org.junit.platform.engine.discovery.FileSelector;
+import org.junit.platform.engine.discovery.IterationSelector;
+import org.junit.platform.engine.discovery.MethodSelector;
+import org.junit.platform.engine.discovery.ModuleSelector;
+import org.junit.platform.engine.discovery.PackageSelector;
+import org.junit.platform.engine.discovery.UriSelector;
 
 /**
  * @since 1.0
@@ -34,11 +43,15 @@ import org.apiguardian.api.API;
 @API(status = INTERNAL, since = "1.0")
 public class CommandLineOptions {
 
-	static final Details DEFAULT_DETAILS = Details.TREE;
-	static final Theme DEFAULT_THEME = Theme.valueOf(Charset.defaultCharset());
+	static final String DEFAULT_DETAILS_NAME = "tree";
+	static final Details DEFAULT_DETAILS = Details.valueOf(DEFAULT_DETAILS_NAME.toUpperCase(Locale.ROOT));
+	static final Theme DEFAULT_THEME = Theme.valueOf(ConsoleUtils.charset());
 
 	private boolean displayHelp;
+	private boolean listEngines;
 	private boolean ansiColorOutputDisabled;
+	private Path colorPalettePath;
+	private boolean isSingleColorPalette;
 	private boolean bannerDisabled;
 	private Details details = DEFAULT_DETAILS;
 	private Theme theme = DEFAULT_THEME;
@@ -49,15 +62,16 @@ public class CommandLineOptions {
 	private List<Path> selectedClasspathEntries = emptyList();
 
 	private boolean scanModulepath;
-	private List<String> selectedModules = emptyList();
 
-	private List<URI> selectedUris = emptyList();
-	private List<String> selectedFiles = emptyList();
-	private List<String> selectedDirectories = emptyList();
-	private List<String> selectedPackages = emptyList();
-	private List<String> selectedClasses = emptyList();
-	private List<String> selectedMethods = emptyList();
-	private List<String> selectedClasspathResources = emptyList();
+	private List<ModuleSelector> selectedModules = emptyList();
+	private List<UriSelector> selectedUris = emptyList();
+	private List<FileSelector> selectedFiles = emptyList();
+	private List<DirectorySelector> selectedDirectories = emptyList();
+	private List<PackageSelector> selectedPackages = emptyList();
+	private List<ClassSelector> selectedClasses = emptyList();
+	private List<MethodSelector> selectedMethods = emptyList();
+	private List<ClasspathResourceSelector> selectedClasspathResources = emptyList();
+	private List<IterationSelector> selectedIterations = emptyList();
 
 	private List<String> includedClassNamePatterns = singletonList(STANDARD_INCLUDE_PATTERN);
 	private List<String> excludedClassNamePatterns = emptyList();
@@ -80,12 +94,36 @@ public class CommandLineOptions {
 		this.displayHelp = displayHelp;
 	}
 
+	public boolean isListEngines() {
+		return this.listEngines;
+	}
+
+	public void setListEngines(boolean listEngines) {
+		this.listEngines = listEngines;
+	}
+
 	public boolean isAnsiColorOutputDisabled() {
 		return this.ansiColorOutputDisabled;
 	}
 
 	public void setAnsiColorOutputDisabled(boolean ansiColorOutputDisabled) {
 		this.ansiColorOutputDisabled = ansiColorOutputDisabled;
+	}
+
+	public Path getColorPalettePath() {
+		return colorPalettePath;
+	}
+
+	public void setColorPalettePath(Path colorPalettePath) {
+		this.colorPalettePath = colorPalettePath;
+	}
+
+	public boolean isSingleColorPalette() {
+		return isSingleColorPalette;
+	}
+
+	public void setSingleColorPalette(boolean singleColorPalette) {
+		this.isSingleColorPalette = singleColorPalette;
 	}
 
 	public boolean isBannerDisabled() {
@@ -156,73 +194,90 @@ public class CommandLineOptions {
 		this.selectedClasspathEntries = selectedClasspathEntries;
 	}
 
-	public List<URI> getSelectedUris() {
-		return this.selectedUris;
+	public List<UriSelector> getSelectedUris() {
+		return selectedUris;
 	}
 
-	public void setSelectedUris(List<URI> selectedUris) {
+	public void setSelectedUris(List<UriSelector> selectedUris) {
 		this.selectedUris = selectedUris;
 	}
 
-	public List<String> getSelectedFiles() {
-		return this.selectedFiles;
+	public List<FileSelector> getSelectedFiles() {
+		return selectedFiles;
 	}
 
-	public void setSelectedFiles(List<String> selectedFiles) {
+	public void setSelectedFiles(List<FileSelector> selectedFiles) {
 		this.selectedFiles = selectedFiles;
 	}
 
-	public List<String> getSelectedDirectories() {
-		return this.selectedDirectories;
+	public List<DirectorySelector> getSelectedDirectories() {
+		return selectedDirectories;
 	}
 
-	public void setSelectedDirectories(List<String> selectedDirectories) {
+	public void setSelectedDirectories(List<DirectorySelector> selectedDirectories) {
 		this.selectedDirectories = selectedDirectories;
 	}
 
-	public List<String> getSelectedModules() {
-		return this.selectedModules;
+	public List<ModuleSelector> getSelectedModules() {
+		return selectedModules;
 	}
 
-	public void setSelectedModules(List<String> selectedModules) {
+	public void setSelectedModules(List<ModuleSelector> selectedModules) {
 		this.selectedModules = selectedModules;
 	}
 
-	public List<String> getSelectedPackages() {
-		return this.selectedPackages;
+	public List<PackageSelector> getSelectedPackages() {
+		return selectedPackages;
 	}
 
-	public void setSelectedPackages(List<String> selectedPackages) {
+	public void setSelectedPackages(List<PackageSelector> selectedPackages) {
 		this.selectedPackages = selectedPackages;
 	}
 
-	public List<String> getSelectedClasses() {
-		return this.selectedClasses;
+	public List<ClassSelector> getSelectedClasses() {
+		return selectedClasses;
 	}
 
-	public void setSelectedClasses(List<String> selectedClasses) {
+	public void setSelectedClasses(List<ClassSelector> selectedClasses) {
 		this.selectedClasses = selectedClasses;
 	}
 
-	public List<String> getSelectedMethods() {
-		return this.selectedMethods;
+	public List<MethodSelector> getSelectedMethods() {
+		return selectedMethods;
 	}
 
-	public void setSelectedMethods(List<String> selectedMethods) {
+	public void setSelectedMethods(List<MethodSelector> selectedMethods) {
 		this.selectedMethods = selectedMethods;
 	}
 
-	public List<String> getSelectedClasspathResources() {
-		return this.selectedClasspathResources;
+	public List<ClasspathResourceSelector> getSelectedClasspathResources() {
+		return selectedClasspathResources;
 	}
 
-	public void setSelectedClasspathResources(List<String> selectedClasspathResources) {
+	public void setSelectedClasspathResources(List<ClasspathResourceSelector> selectedClasspathResources) {
 		this.selectedClasspathResources = selectedClasspathResources;
 	}
 
-	public boolean hasExplicitSelectors() {
-		return Stream.of(selectedUris, selectedFiles, selectedDirectories, selectedPackages, selectedClasses,
-			selectedMethods, selectedClasspathResources).anyMatch(selectors -> !selectors.isEmpty());
+	public List<IterationSelector> getSelectedIterations() {
+		return selectedIterations;
+	}
+
+	public void setSelectedIterations(List<IterationSelector> selectedIterations) {
+		this.selectedIterations = selectedIterations;
+	}
+
+	public List<DiscoverySelector> getExplicitSelectors() {
+		List<DiscoverySelector> selectors = new ArrayList<>();
+		selectors.addAll(getSelectedUris());
+		selectors.addAll(getSelectedFiles());
+		selectors.addAll(getSelectedDirectories());
+		selectors.addAll(getSelectedModules());
+		selectors.addAll(getSelectedPackages());
+		selectors.addAll(getSelectedClasses());
+		selectors.addAll(getSelectedMethods());
+		selectors.addAll(getSelectedClasspathResources());
+		selectors.addAll(getSelectedIterations());
+		return selectors;
 	}
 
 	public List<String> getIncludedClassNamePatterns() {

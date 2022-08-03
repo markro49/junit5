@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2021 the original author or authors.
+ * Copyright 2015-2022 the original author or authors.
  *
  * All rights reserved. This program and the accompanying materials are
  * made available under the terms of the Eclipse Public License v2.0 which
@@ -10,7 +10,7 @@
 
 package org.junit.platform.suite.api;
 
-import static org.apiguardian.api.API.Status.MAINTAINED;
+import static org.apiguardian.api.API.Status.DEPRECATED;
 
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
@@ -37,17 +37,20 @@ import org.apiguardian.api.API;
  * <p>Note that the presence of {@code @UseTechnicalNames} overrides any custom
  * display name configured for the suite via {@link SuiteDisplayName @SuiteDisplayName}.
  *
- * <h4>JUnit 4 Suite Support</h4>
+ * <h2>JUnit 4 Suite Support</h2>
  * <p>Test suites can be run on the JUnit Platform in a JUnit 4 environment via
  * {@code @RunWith(JUnitPlatform.class)}.
  *
  * @since 1.0
  * @see org.junit.platform.runner.JUnitPlatform
+ * @deprecated since 1.8, in favor of the {@link Suite @Suite} support provided by
+ * the {@code junit-platform-suite-engine} module; to be removed in JUnit Platform 2.0
  */
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.TYPE)
 @Inherited
 @Documented
-@API(status = MAINTAINED, since = "1.0")
+@API(status = DEPRECATED, since = "1.8")
+@Deprecated
 public @interface UseTechnicalNames {
 }

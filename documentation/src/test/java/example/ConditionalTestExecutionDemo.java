@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2021 the original author or authors.
+ * Copyright 2015-2022 the original author or authors.
  *
  * All rights reserved. This program and the accompanying materials are
  * made available under the terms of the Eclipse Public License v2.0 which
@@ -70,6 +70,32 @@ class ConditionalTestExecutionDemo {
 	@interface TestOnMac {
 	}
 	// end::user_guide_os[]
+
+	// tag::user_guide_architecture[]
+	@Test
+	@EnabledOnOs(architectures = "aarch64")
+	void onAarch64() {
+		// ...
+	}
+
+	@Test
+	@DisabledOnOs(architectures = "x86_64")
+	void notOnX86_64() {
+		// ...
+	}
+
+	@Test
+	@EnabledOnOs(value = MAC, architectures = "aarch64")
+	void onNewMacs() {
+		// ...
+	}
+
+	@Test
+	@DisabledOnOs(value = MAC, architectures = "aarch64")
+	void notOnNewMacs() {
+		// ...
+	}
+	// end::user_guide_architecture[]
 
 	// tag::user_guide_jre[]
 	@Test

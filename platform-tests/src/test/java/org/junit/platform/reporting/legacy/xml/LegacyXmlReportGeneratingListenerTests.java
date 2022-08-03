@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2021 the original author or authors.
+ * Copyright 2015-2022 the original author or authors.
  *
  * All rights reserved. This program and the accompanying materials are
  * made available under the terms of the Eclipse Public License v2.0 which
@@ -20,6 +20,7 @@ import static org.junit.platform.engine.discovery.DiscoverySelectors.selectUniqu
 import static org.junit.platform.launcher.core.LauncherDiscoveryRequestBuilder.request;
 import static org.junit.platform.launcher.core.LauncherFactoryForTestingPurposesOnly.createLauncher;
 import static org.junit.platform.reporting.legacy.xml.XmlReportAssertions.assertValidAccordingToJenkinsSchema;
+import static org.mockito.Mockito.mock;
 
 import java.io.File;
 import java.io.PrintWriter;
@@ -41,6 +42,7 @@ import java.util.Set;
 import org.joox.Match;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.platform.engine.ConfigurationParameters;
 import org.junit.platform.engine.TestEngine;
 import org.junit.platform.engine.UniqueId;
 import org.junit.platform.engine.reporting.ReportEntry;
@@ -70,7 +72,7 @@ class LegacyXmlReportGeneratingListenerTests {
 		engine.addTest("succeedingTest", "display<-->Name 😎", () -> {
 		});
 
-		executeTests(engine, tempDirectory);
+		executeTests(engine);
 
 		var testsuite = readValidXmlFile(tempDirectory.resolve("TEST-dummy.xml"));
 
@@ -99,7 +101,7 @@ class LegacyXmlReportGeneratingListenerTests {
 		var engine = new DemoHierarchicalTestEngine("dummy");
 		engine.addTest("failingTest", () -> fail("expected to <b>fail</b>"));
 
-		executeTests(engine, tempDirectory);
+		executeTests(engine);
 
 		var testsuite = readValidXmlFile(tempDirectory.resolve("TEST-dummy.xml"));
 
@@ -127,7 +129,7 @@ class LegacyXmlReportGeneratingListenerTests {
 			throw new RuntimeException("error occurred");
 		});
 
-		executeTests(engine, tempDirectory);
+		executeTests(engine);
 
 		var testsuite = readValidXmlFile(tempDirectory.resolve("TEST-dummy.xml"));
 
@@ -154,7 +156,7 @@ class LegacyXmlReportGeneratingListenerTests {
 		var testDescriptor = engine.addTest("skippedTest", () -> fail("never called"));
 		testDescriptor.markSkipped("should be skipped");
 
-		executeTests(engine, tempDirectory);
+		executeTests(engine);
 
 		var testsuite = readValidXmlFile(tempDirectory.resolve("TEST-dummy.xml"));
 
@@ -177,7 +179,7 @@ class LegacyXmlReportGeneratingListenerTests {
 		var engine = new DemoHierarchicalTestEngine("dummy");
 		engine.addTest("abortedTest", () -> assumeFalse(true, "deliberately aborted"));
 
-		executeTests(engine, tempDirectory);
+		executeTests(engine);
 
 		var testsuite = readValidXmlFile(tempDirectory.resolve("TEST-dummy.xml"));
 
@@ -203,7 +205,7 @@ class LegacyXmlReportGeneratingListenerTests {
 		engine.addTest("secondTest", () -> {
 		});
 
-		executeTests(engine, tempDirectory, new IncrementingClock(0, Duration.ofMillis(333)));
+		executeTests(engine, new IncrementingClock(0, Duration.ofMillis(333)));
 
 		var testsuite = readValidXmlFile(tempDirectory.resolve("TEST-dummy.xml"));
 
@@ -227,7 +229,7 @@ class LegacyXmlReportGeneratingListenerTests {
 		engine.addTest("test", () -> {
 		});
 
-		executeTests(engine, tempDirectory, Clock.fixed(Instant.EPOCH, ZoneId.systemDefault()));
+		executeTests(engine, Clock.fixed(Instant.EPOCH, ZoneId.systemDefault()));
 
 		var testsuite = readValidXmlFile(tempDirectory.resolve("TEST-dummy.xml"));
 
@@ -240,7 +242,7 @@ class LegacyXmlReportGeneratingListenerTests {
 		engine.addTest("test", () -> fail("never called"));
 		engine.getEngineDescriptor().markSkipped("should be skipped");
 
-		executeTests(engine, tempDirectory);
+		executeTests(engine);
 
 		var testsuite = readValidXmlFile(tempDirectory.resolve("TEST-dummy.xml"));
 
@@ -258,7 +260,7 @@ class LegacyXmlReportGeneratingListenerTests {
 		engine.addTest("test", () -> fail("never called"));
 		engine.getEngineDescriptor().setBeforeAllBehavior(() -> fail("failure before all tests"));
 
-		executeTests(engine, tempDirectory);
+		executeTests(engine);
 
 		var testsuite = readValidXmlFile(tempDirectory.resolve("TEST-dummy.xml"));
 
@@ -281,7 +283,7 @@ class LegacyXmlReportGeneratingListenerTests {
 			throw new RuntimeException("boom");
 		});
 
-		executeTests(engine, tempDirectory);
+		executeTests(engine);
 
 		var testsuite = readValidXmlFile(tempDirectory.resolve("TEST-dummy.xml"));
 
@@ -309,11 +311,11 @@ class LegacyXmlReportGeneratingListenerTests {
 					throw new RuntimeException("boom");
 				}
 			}, "child");
-		container.addChild(
-			new DemoHierarchicalTestDescriptor(container.getUniqueId().append("test", "someTest"), "someTest", () -> {
+		container.addChild(new DemoHierarchicalTestDescriptor(container.getUniqueId().append("test", "someTest"),
+			"someTest", (c, t) -> {
 			}));
 
-		executeTests(engine, tempDirectory);
+		executeTests(engine);
 
 		var testsuite = readValidXmlFile(tempDirectory.resolve("TEST-dummy.xml"));
 
@@ -336,7 +338,7 @@ class LegacyXmlReportGeneratingListenerTests {
 		engine.addTest("test", () -> {
 		});
 
-		executeTests(engine, tempDirectory);
+		executeTests(engine);
 
 		var testsuite = readValidXmlFile(tempDirectory.resolve("TEST-dummy.xml"));
 		var properties = testsuite.child("properties").children("property");
@@ -353,7 +355,7 @@ class LegacyXmlReportGeneratingListenerTests {
 		var now = LocalDateTime.parse("2016-01-28T14:02:59.123");
 		var zone = ZoneId.systemDefault();
 
-		executeTests(engine, tempDirectory, Clock.fixed(ZonedDateTime.of(now, zone).toInstant(), zone));
+		executeTests(engine, Clock.fixed(ZonedDateTime.of(now, zone).toInstant(), zone));
 
 		var testsuite = readValidXmlFile(tempDirectory.resolve("TEST-dummy.xml"));
 		assertThat(testsuite.attr("hostname")).isEqualTo(InetAddress.getLocalHost().getHostName());
@@ -368,7 +370,7 @@ class LegacyXmlReportGeneratingListenerTests {
 		var out = new StringWriter();
 		var listener = new LegacyXmlReportGeneratingListener(reportsDir, new PrintWriter(out));
 
-		listener.testPlanExecutionStarted(TestPlan.from(Set.of()));
+		listener.testPlanExecutionStarted(TestPlan.from(Set.of(), mock(ConfigurationParameters.class)));
 
 		assertThat(out.toString()).containsSubsequence("Could not create reports directory",
 			"FileAlreadyExistsException", "at ");
@@ -384,7 +386,7 @@ class LegacyXmlReportGeneratingListenerTests {
 		var out = new StringWriter();
 		var listener = new LegacyXmlReportGeneratingListener(tempDirectory, new PrintWriter(out));
 
-		listener.testPlanExecutionStarted(TestPlan.from(Set.of(engineDescriptor)));
+		listener.testPlanExecutionStarted(TestPlan.from(Set.of(engineDescriptor), mock(ConfigurationParameters.class)));
 		listener.executionFinished(TestIdentifier.from(engineDescriptor), successful());
 
 		assertThat(out.toString()).containsSubsequence("Could not write XML report", "Exception", "at ");
@@ -394,7 +396,7 @@ class LegacyXmlReportGeneratingListenerTests {
 	void writesReportEntriesToSystemOutElement() throws Exception {
 		var engineDescriptor = new EngineDescriptor(UniqueId.forEngine("engine"), "Engine");
 		engineDescriptor.addChild(new TestDescriptorStub(UniqueId.root("child", "test"), "test"));
-		var testPlan = TestPlan.from(Set.of(engineDescriptor));
+		var testPlan = TestPlan.from(Set.of(engineDescriptor), mock(ConfigurationParameters.class));
 
 		var out = new StringWriter();
 		var listener = new LegacyXmlReportGeneratingListener(tempDirectory, new PrintWriter(out));
@@ -418,11 +420,11 @@ class LegacyXmlReportGeneratingListenerTests {
 					"Report Entry #2 (timestamp: " + Year.now(), "- bar: baz\n", "- qux: foo\n");
 	}
 
-	private void executeTests(TestEngine engine, Path tempDirectory) {
-		executeTests(engine, tempDirectory, Clock.systemDefaultZone());
+	private void executeTests(TestEngine engine) {
+		executeTests(engine, Clock.systemDefaultZone());
 	}
 
-	private void executeTests(TestEngine engine, Path tempDirectory, Clock clock) {
+	private void executeTests(TestEngine engine, Clock clock) {
 		var out = new PrintWriter(new StringWriter());
 		var reportListener = new LegacyXmlReportGeneratingListener(tempDirectory.toString(), out, clock);
 		var launcher = createLauncher(engine);

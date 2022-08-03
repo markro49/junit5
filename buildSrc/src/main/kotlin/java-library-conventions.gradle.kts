@@ -1,3 +1,4 @@
+import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
 import org.gradle.api.tasks.PathSensitivity.RELATIVE
 
 plugins {
@@ -5,7 +6,8 @@ plugins {
 	eclipse
 	idea
 	checkstyle
-	id("java-toolchain-conventions")
+	id("base-conventions")
+	id("jacoco-conventions")
 }
 
 val mavenizedProjects: List<Project> by rootProject.extra
@@ -33,6 +35,10 @@ eclipse {
 	}
 }
 
+java {
+	modularity.inferModulePath.set(false)
+}
+
 if (project in mavenizedProjects) {
 
 	apply(plugin = "publishing-conventions")
@@ -50,13 +56,9 @@ if (project in mavenizedProjects) {
 			encoding = "UTF-8"
 			locale = "en"
 			(this as StandardJavadocDocletOptions).apply {
-				addBooleanOption("Xdoclint:html,syntax", true)
+				addBooleanOption("Xdoclint:all,-missing,-reference", true)
+				addBooleanOption("XD-Xlint:none", true)
 				addBooleanOption("html5", true)
-				// Javadoc 13 removed support for `--no-module-directories`
-				// https://bugs.openjdk.java.net/browse/JDK-8215580
-				if (javaVersion.isJava12 && executable == null) {
-					addBooleanOption("-no-module-directories", true)
-				}
 				addMultilineStringsOption("tag").value = listOf(
 						"apiNote:a:API Note:",
 						"implNote:a:Implementation Note:"
@@ -114,6 +116,13 @@ if (project in mavenizedProjects) {
 	}
 }
 
+tasks.withType<AbstractArchiveTask>().configureEach {
+	isPreserveFileTimestamps = false
+	isReproducibleFileOrder = true
+	dirMode = Integer.parseInt("0755", 8)
+	fileMode = Integer.parseInt("0644", 8)
+}
+
 normalization {
 	runtimeClasspath {
 		metaInf {
@@ -136,7 +145,7 @@ val allMainClasses by tasks.registering {
 val compileModule by tasks.registering(JavaCompile::class) {
 	dependsOn(allMainClasses)
 	source = fileTree(moduleSourceDir)
-	destinationDir = moduleOutputDir
+	destinationDirectory.set(moduleOutputDir)
 	sourceCompatibility = "9"
 	targetCompatibility = "9"
 	classpath = files()
@@ -146,10 +155,10 @@ val compileModule by tasks.registering(JavaCompile::class) {
 			"-Xlint:all,-requires-automatic,-requires-transitive-automatic",
 			"-Werror", // Terminates compilation when warnings occur.
 			"--module-version", "${project.version}",
-			"--module-source-path", files(modularProjects.map { "${it.projectDir}/src/module" }).asPath
 	))
 	options.compilerArgumentProviders.add(ModulePathArgumentProvider())
 	options.compilerArgumentProviders.addAll(modularProjects.map { PatchModuleArgumentProvider(it) })
+	modularity.inferModulePath.set(false)
 }
 
 tasks.withType<Jar>().configureEach {
@@ -158,7 +167,7 @@ tasks.withType<Jar>().configureEach {
 		into("META-INF")
 	}
 	val suffix = archiveClassifier.getOrElse("")
-	if (suffix.isBlank() || suffix == "all") { // "all" is used by shadow plugin
+	if (suffix.isBlank() || this is ShadowJar) {
 		dependsOn(allMainClasses, compileModule)
 		from("$moduleOutputDir/$javaModuleName") {
 			include("module-info.class")
@@ -209,7 +218,12 @@ tasks.compileTestJava {
 inner class ModulePathArgumentProvider : CommandLineArgumentProvider, Named {
 	@get:CompileClasspath
 	val modulePath: Provider<Configuration> = configurations.compileClasspath
-	override fun asArguments() = listOf("--module-path", modulePath.get().asPath)
+	override fun asArguments() = listOf(
+									"--module-path",
+									modulePath.get().asPath,
+									"--module-source-path",
+									files(modularProjects.map { "${it.projectDir}/src/module" }).asPath
+								)
 	@Internal
 	override fun getName() = "module-path"
 }
@@ -255,18 +269,30 @@ afterEvaluate {
 	}
 	tasks {
 		compileJava {
-			options.release.set(extension.mainJavaVersion.majorVersion.toInt())
+			if (extension.configureRelease) {
+				options.release.set(extension.mainJavaVersion.majorVersion.toInt())
+			} else {
+				sourceCompatibility = extension.mainJavaVersion.majorVersion
+				targetCompatibility = extension.mainJavaVersion.majorVersion
+			}
 		}
 		compileTestJava {
-			options.release.set(extension.testJavaVersion.majorVersion.toInt())
+			if (extension.configureRelease) {
+				options.release.set(extension.testJavaVersion.majorVersion.toInt())
+			} else {
+				sourceCompatibility = extension.testJavaVersion.majorVersion
+				targetCompatibility = extension.testJavaVersion.majorVersion
+			}
 		}
 	}
 	pluginManager.withPlugin("groovy") {
 		tasks.named<GroovyCompile>("compileGroovy").configure {
+			// Groovy compiler does not support the --release flag.
 			sourceCompatibility = extension.mainJavaVersion.majorVersion
 			targetCompatibility = extension.mainJavaVersion.majorVersion
 		}
 		tasks.named<GroovyCompile>("compileTestGroovy").configure {
+			// Groovy compiler does not support the --release flag.
 			sourceCompatibility = extension.testJavaVersion.majorVersion
 			targetCompatibility = extension.testJavaVersion.majorVersion
 		}
@@ -274,8 +300,7 @@ afterEvaluate {
 }
 
 checkstyle {
-	val libs = project.extensions["libs"] as VersionCatalog
-	toolVersion = libs.findVersion("checkstyle").get().requiredVersion
+	toolVersion = requiredVersionFromLibs("checkstyle")
 	configDirectory.set(rootProject.file("src/checkstyle"))
 }
 

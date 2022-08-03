@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2021 the original author or authors.
+ * Copyright 2015-2022 the original author or authors.
  *
  * All rights reserved. This program and the accompanying materials are
  * made available under the terms of the Eclipse Public License v2.0 which
@@ -14,12 +14,18 @@ import org.junit.platform.engine.EngineDiscoveryRequest;
 import org.junit.platform.engine.TestDescriptor;
 import org.junit.platform.engine.support.discovery.EngineDiscoveryRequestResolver;
 
+/**
+ * @since 1.8
+ */
 final class DiscoverySelectorResolver {
 
 	// @formatter:off
 	private static final EngineDiscoveryRequestResolver<SuiteEngineDescriptor> resolver = EngineDiscoveryRequestResolver.<SuiteEngineDescriptor>builder()
 			.addClassContainerSelectorResolver(new IsSuiteClass())
-			.addSelectorResolver(context -> new ClassSelectorResolver(context.getClassNameFilter(), context.getEngineDescriptor()))
+			.addSelectorResolver(context -> new ClassSelectorResolver(
+					context.getClassNameFilter(),
+					context.getEngineDescriptor(),
+					context.getDiscoveryRequest().getConfigurationParameters()))
 			.build();
 	// @formatter:on
 

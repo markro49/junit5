@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2021 the original author or authors.
+ * Copyright 2015-2022 the original author or authors.
  *
  * All rights reserved. This program and the accompanying materials are
  * made available under the terms of the Eclipse Public License v2.0 which
@@ -22,11 +22,13 @@ import org.apiguardian.api.API;
 import org.apiguardian.api.API.Status;
 
 /**
- * {@code @Configuration} specifies the configuration {@linkplain #key key} and
- * {@linkplain #value value} pairs to be added to the discovery request when running
+ * {@code @ConfigurationParameter} is a {@linkplain Repeatable repeatable}
+ * annotation that specifies a configuration {@link #key key} and
+ * {@link #value value} pair to be added to the discovery request when running
  * a test suite on the JUnit Platform.
  *
  * @since 1.8
+ * @see DisableParentConfigurationParameters
  * @see Suite
  * @see org.junit.platform.runner.JUnitPlatform
  * @see org.junit.platform.launcher.core.LauncherDiscoveryRequestBuilder#configurationParameter(String, String)
@@ -40,13 +42,13 @@ import org.apiguardian.api.API.Status;
 public @interface ConfigurationParameter {
 
 	/**
-	 * The configuration parameter key under which to add the
-	 * value to the discovery request; never {@code null} or blank.
+	 * The configuration parameter key under which to add the {@link #value() value}
+	 * to the discovery request; never {@code null} or blank.
 	 */
 	String key();
 
 	/**
-	 * The value to add to the discovery request.
+	 * The value to add to the discovery request for the specified {@link #key() key}.
 	 */
 	String value();
 

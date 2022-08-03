@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2021 the original author or authors.
+ * Copyright 2015-2022 the original author or authors.
  *
  * All rights reserved. This program and the accompanying materials are
  * made available under the terms of the Eclipse Public License v2.0 which
@@ -14,6 +14,7 @@ import java.io.InputStream;
 import java.net.URL;
 import java.net.URLConnection;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
@@ -23,6 +24,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Properties;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.junit.platform.commons.logging.Logger;
 import org.junit.platform.commons.logging.LoggerFactory;
@@ -59,10 +61,17 @@ class LauncherConfigurationParameters implements ConfigurationParameters {
 	}
 
 	@Override
+	@SuppressWarnings("deprecation")
 	public int size() {
 		return providers.stream() //
 				.mapToInt(ParameterProvider::size) //
 				.sum();
+	}
+
+	@Override
+	public Set<String> keySet() {
+		return providers.stream().map(ParameterProvider::keySet).flatMap(Collection::stream).collect(
+			Collectors.toSet());
 	}
 
 	private String getProperty(String key) {
@@ -86,6 +95,7 @@ class LauncherConfigurationParameters implements ConfigurationParameters {
 		private final Map<String, String> explicitParameters = new HashMap<>();
 		private boolean implicitProvidersEnabled = true;
 		private String configFileName = ConfigurationParameters.CONFIG_FILE_NAME;
+		private ConfigurationParameters parentConfigurationParameters;
 
 		private Builder() {
 		}
@@ -107,11 +117,22 @@ class LauncherConfigurationParameters implements ConfigurationParameters {
 			return this;
 		}
 
+		Builder parentConfigurationParameters(ConfigurationParameters parameters) {
+			Preconditions.notNull(parameters, "parent configuration parameters must not be null");
+			this.parentConfigurationParameters = parameters;
+			return this;
+		}
+
 		LauncherConfigurationParameters build() {
 			List<ParameterProvider> parameterProviders = new ArrayList<>();
 			if (!explicitParameters.isEmpty()) {
 				parameterProviders.add(ParameterProvider.explicit(explicitParameters));
 			}
+
+			if (parentConfigurationParameters != null) {
+				parameterProviders.add(ParameterProvider.inherited(parentConfigurationParameters));
+			}
+
 			if (implicitProvidersEnabled) {
 				parameterProviders.add(ParameterProvider.systemProperties());
 				parameterProviders.add(ParameterProvider.propertiesFile(configFileName));
@@ -128,6 +149,8 @@ class LauncherConfigurationParameters implements ConfigurationParameters {
 			return 0;
 		}
 
+		Set<String> keySet();
+
 		static ParameterProvider explicit(Map<String, String> configParams) {
 			return new ParameterProvider() {
 				@Override
@@ -138,6 +161,11 @@ class LauncherConfigurationParameters implements ConfigurationParameters {
 				@Override
 				public int size() {
 					return configParams.size();
+				}
+
+				@Override
+				public Set<String> keySet() {
+					return configParams.keySet();
 				}
 
 				@Override
@@ -162,6 +190,11 @@ class LauncherConfigurationParameters implements ConfigurationParameters {
 				}
 
 				@Override
+				public Set<String> keySet() {
+					return System.getProperties().stringPropertyNames();
+				}
+
+				@Override
 				public String toString() {
 					return "systemProperties [...]";
 				}
@@ -178,9 +211,41 @@ class LauncherConfigurationParameters implements ConfigurationParameters {
 				}
 
 				@Override
+				public Set<String> keySet() {
+					return properties.stringPropertyNames();
+				}
+
+				@Override
 				public String toString() {
 					ToStringBuilder builder = new ToStringBuilder("propertiesFile");
 					properties.stringPropertyNames().forEach(key -> builder.append(key, getValue(key)));
+					return builder.toString();
+				}
+			};
+		}
+
+		static ParameterProvider inherited(ConfigurationParameters configParams) {
+			return new ParameterProvider() {
+				@Override
+				public String getValue(String key) {
+					return configParams.get(key).orElse(null);
+				}
+
+				@Override
+				@SuppressWarnings("deprecation")
+				public int size() {
+					return configParams.size();
+				}
+
+				@Override
+				public Set<String> keySet() {
+					return configParams.keySet();
+				}
+
+				@Override
+				public String toString() {
+					ToStringBuilder builder = new ToStringBuilder("inherited");
+					builder.append("parent", configParams);
 					return builder.toString();
 				}
 			};
@@ -203,7 +268,7 @@ class LauncherConfigurationParameters implements ConfigurationParameters {
 				}
 
 				URL configFileUrl = resources.iterator().next(); // same as List#get(0)
-				logger.info(() -> String.format(
+				logger.config(() -> String.format(
 					"Loading JUnit Platform configuration parameters from classpath resource [%s].", configFileUrl));
 				URLConnection urlConnection = configFileUrl.openConnection();
 				urlConnection.setUseCaches(false);

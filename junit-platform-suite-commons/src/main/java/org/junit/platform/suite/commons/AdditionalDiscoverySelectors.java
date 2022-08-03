@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2021 the original author or authors.
+ * Copyright 2015-2022 the original author or authors.
  *
  * All rights reserved. This program and the accompanying materials are
  * made available under the terms of the Eclipse Public License v2.0 which
@@ -11,12 +11,12 @@
 package org.junit.platform.suite.commons;
 
 import java.util.Arrays;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import org.junit.platform.commons.util.Preconditions;
+import org.junit.platform.commons.util.StringUtils;
 import org.junit.platform.engine.discovery.ClassSelector;
 import org.junit.platform.engine.discovery.ClasspathResourceSelector;
 import org.junit.platform.engine.discovery.DirectorySelector;
@@ -27,15 +27,18 @@ import org.junit.platform.engine.discovery.ModuleSelector;
 import org.junit.platform.engine.discovery.PackageSelector;
 import org.junit.platform.engine.discovery.UriSelector;
 
+/**
+ * @since 1.8
+ */
 class AdditionalDiscoverySelectors {
 
 	static List<UriSelector> selectUris(String... uris) {
-		Preconditions.notNull(uris, "Uris must not be null");
-		Preconditions.containsNoNullElements(uris, "Individual uris must not be null");
+		Preconditions.notNull(uris, "URI list must not be null");
+		Preconditions.containsNoNullElements(uris, "Individual URIs must not be null");
 
 		// @formatter:off
 		return uniqueStreamOf(uris)
-				.filter(s -> !s.isEmpty())
+				.filter(StringUtils::isNotBlank)
 				.map(DiscoverySelectors::selectUri)
 				.collect(Collectors.toList());
 		// @formatter:on
@@ -47,7 +50,7 @@ class AdditionalDiscoverySelectors {
 
 		// @formatter:off
 		return uniqueStreamOf(paths)
-				.filter(s -> !s.isEmpty())
+				.filter(StringUtils::isNotBlank)
 				.map(DiscoverySelectors::selectDirectory)
 				.collect(Collectors.toList());
 		// @formatter:on
@@ -66,7 +69,7 @@ class AdditionalDiscoverySelectors {
 
 	static List<ClassSelector> selectClasses(Class<?>... classes) {
 		Preconditions.notNull(classes, "classes must not be null");
-		Preconditions.containsNoNullElements(classes, "individual classes must not be null");
+		Preconditions.containsNoNullElements(classes, "Individual classes must not be null");
 
 		// @formatter:off
 		return uniqueStreamOf(classes)
@@ -77,7 +80,7 @@ class AdditionalDiscoverySelectors {
 
 	static List<ModuleSelector> selectModules(String... moduleNames) {
 		Preconditions.notNull(moduleNames, "Module names must not be null");
-		Preconditions.containsNoNullElements(moduleNames, "Individual module name must not be null");
+		Preconditions.containsNoNullElements(moduleNames, "Individual module names must not be null");
 
 		return DiscoverySelectors.selectModules(uniqueStreamOf(moduleNames).collect(Collectors.toSet()));
 	}
@@ -107,7 +110,7 @@ class AdditionalDiscoverySelectors {
 	}
 
 	private static <T> Stream<T> uniqueStreamOf(T[] packageNames) {
-		return new LinkedHashSet<>(Arrays.asList(packageNames)).stream();
+		return Arrays.stream(packageNames).distinct();
 	}
 
 }

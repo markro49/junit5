@@ -1,17 +1,18 @@
 plugins {
 	`java-library-conventions`
-	`testing-conventions`
 }
 
 description = "JUnit Platform Suite Commons"
 
 dependencies {
-	api(platform(projects.bom))
-	api(libs.apiguardian)
-	api(projects.platform.launcher)
+	api(platform(projects.junitBom))
+	api(projects.junitPlatformLauncher)
 
-	implementation(projects.platform.engine)
-	implementation(projects.platform.suite.api)
+	compileOnlyApi(libs.apiguardian)
 
-	testImplementation(projects.jupiter.engine)
+	implementation(projects.junitPlatformEngine)
+	implementation(projects.junitPlatformSuiteApi)
+
+	osgiVerification(projects.junitJupiterEngine)
+	osgiVerification(projects.junitPlatformLauncher)
 }

@@ -5,9 +5,12 @@ plugins {
 description = "JUnit Jupiter (Aggregator)"
 
 dependencies {
-	api(platform(projects.bom))
-	api(projects.jupiter.api)
-	api(projects.jupiter.params)
+	api(platform(projects.junitBom))
+	api(projects.junitJupiterApi)
+	api(projects.junitJupiterParams)
 
-	runtimeOnly(projects.jupiter.engine)
+	runtimeOnly(projects.junitJupiterEngine)
+
+	osgiVerification(projects.junitJupiterEngine)
+	osgiVerification(projects.junitPlatformLauncher)
 }

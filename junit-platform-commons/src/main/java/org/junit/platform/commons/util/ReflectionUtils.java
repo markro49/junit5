@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2021 the original author or authors.
+ * Copyright 2015-2022 the original author or authors.
  *
  * All rights reserved. This program and the accompanying materials are
  * made available under the terms of the Eclipse Public License v2.0 which
@@ -41,13 +41,13 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.IdentityHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Predicate;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -61,7 +61,7 @@ import org.junit.platform.commons.logging.LoggerFactory;
 /**
  * Collection of utilities for working with the Java reflection APIs.
  *
- * <h3>DISCLAIMER</h3>
+ * <h2>DISCLAIMER</h2>
  *
  * <p>These utilities are intended solely for usage within the JUnit framework
  * itself. <strong>Any usage by external parties is not supported.</strong>
@@ -115,7 +115,9 @@ public final class ReflectionUtils {
 	private static final Pattern VM_INTERNAL_PRIMITIVE_ARRAY_PATTERN = Pattern.compile("^(\\[+)(\\[[ZBCDFIJS])$");
 
 	// Pattern: "java.lang.String[]", "int[]", "int[][][][]", etc.
-	private static final Pattern SOURCE_CODE_SYNTAX_ARRAY_PATTERN = Pattern.compile("^([^\\[\\]]+)((\\[\\])+)+$");
+	// ?> => non-capturing atomic group
+	// ++ => possessive quantifier
+	private static final Pattern SOURCE_CODE_SYNTAX_ARRAY_PATTERN = Pattern.compile("^([^\\[\\]]+)((?>\\[\\])++)$");
 
 	private static final Class<?>[] EMPTY_CLASS_ARRAY = new Class<?>[0];
 
@@ -130,7 +132,7 @@ public final class ReflectionUtils {
 	 * @since 1.6
 	 * @see #detectInnerClassCycle(Class)
 	 */
-	private static final Set<String> noCyclesDetectedCache = new HashSet<>();
+	private static final Set<String> noCyclesDetectedCache = ConcurrentHashMap.newKeySet();
 
 	/**
 	 * Internal cache of common class names mapped to their types.
@@ -365,6 +367,42 @@ public final class ReflectionUtils {
 	}
 
 	/**
+	 * Determine if an object of the supplied source type can be assigned to the
+	 * supplied target type for the purpose of reflective method invocations.
+	 *
+	 * <p>In contrast to {@link Class#isAssignableFrom(Class)}, this method
+	 * returns {@code true} if the target type represents a primitive type whose
+	 * wrapper matches the supplied source type. In addition, this method
+	 * also supports
+	 * <a href="https://docs.oracle.com/javase/specs/jls/se8/html/jls-5.html#jls-5.1.2">
+	 * widening conversions</a> for primitive target types.
+	 *
+	 * @param sourceType the non-primitive target type; never {@code null}
+	 * @param targetType the target type; never {@code null}
+	 * @return {@code true} if an object of the source type is assignment compatible
+	 * with the target type
+	 * @since 1.8
+	 * @see Class#isInstance(Object)
+	 * @see Class#isAssignableFrom(Class)
+	 * @see #isAssignableTo(Object, Class)
+	 */
+	public static boolean isAssignableTo(Class<?> sourceType, Class<?> targetType) {
+		Preconditions.notNull(sourceType, "source type must not be null");
+		Preconditions.condition(!sourceType.isPrimitive(), "source type must not be a primitive type");
+		Preconditions.notNull(targetType, "target type must not be null");
+
+		if (targetType.isAssignableFrom(sourceType)) {
+			return true;
+		}
+
+		if (targetType.isPrimitive()) {
+			return sourceType == primitiveToWrapperMap.get(targetType) || isWideningConversion(sourceType, targetType);
+		}
+
+		return false;
+	}
+
+	/**
 	 * Determine if the supplied object can be assigned to the supplied target
 	 * type for the purpose of reflective method invocations.
 	 *
@@ -384,6 +422,7 @@ public final class ReflectionUtils {
 	 * @return {@code true} if the object is assignment compatible
 	 * @see Class#isInstance(Object)
 	 * @see Class#isAssignableFrom(Class)
+	 * @see #isAssignableTo(Class, Class)
 	 */
 	public static boolean isAssignableTo(Object obj, Class<?> targetType) {
 		Preconditions.notNull(targetType, "target type must not be null");
@@ -548,9 +587,9 @@ public final class ReflectionUtils {
 	 * @param fieldName the name of the field; never {@code null} or empty
 	 * @param instance the instance from where the value is to be read; may
 	 * be {@code null} for a static field
+	 * @since 1.4
 	 * @see #tryToReadFieldValue(Field)
 	 * @see #tryToReadFieldValue(Field, Object)
-	 * @since 1.4
 	 */
 	@API(status = INTERNAL, since = "1.4")
 	public static <T> Try<Object> tryToReadFieldValue(Class<T> clazz, String fieldName, T instance) {
@@ -589,9 +628,9 @@ public final class ReflectionUtils {
 	 * is returned that contains the corresponding exception.
 	 *
 	 * @param field the field to read; never {@code null}
+	 * @since 1.4
 	 * @see #tryToReadFieldValue(Field, Object)
 	 * @see #tryToReadFieldValue(Class, String, Object)
-	 * @since 1.4
 	 */
 	@API(status = INTERNAL, since = "1.4")
 	public static Try<Object> tryToReadFieldValue(Field field) {
@@ -621,9 +660,9 @@ public final class ReflectionUtils {
 	}
 
 	/**
+	 * @since 1.4
 	 * @see org.junit.platform.commons.support.ReflectionSupport#tryToReadFieldValue(Field, Object)
 	 * @see #tryToReadFieldValue(Class, String, Object)
-	 * @since 1.4
 	 */
 	@API(status = INTERNAL, since = "1.4")
 	public static Try<Object> tryToReadFieldValue(Field field, Object instance) {
@@ -703,8 +742,8 @@ public final class ReflectionUtils {
 	}
 
 	/**
-	 * @see org.junit.platform.commons.support.ReflectionSupport#tryToLoadClass(String)
 	 * @since 1.4
+	 * @see org.junit.platform.commons.support.ReflectionSupport#tryToLoadClass(String)
 	 */
 	@API(status = INTERNAL, since = "1.4")
 	public static Try<Class<?>> tryToLoadClass(String name) {
@@ -739,8 +778,8 @@ public final class ReflectionUtils {
 	 *
 	 * @param name the name of the class to load; never {@code null} or blank
 	 * @param classLoader the {@code ClassLoader} to use; never {@code null}
-	 * @see #tryToLoadClass(String)
 	 * @since 1.4
+	 * @see #tryToLoadClass(String)
 	 */
 	@API(status = INTERNAL, since = "1.4")
 	public static Try<Class<?>> tryToLoadClass(String name, ClassLoader classLoader) {

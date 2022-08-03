@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2021 the original author or authors.
+ * Copyright 2015-2022 the original author or authors.
  *
  * All rights reserved. This program and the accompanying materials are
  * made available under the terms of the Eclipse Public License v2.0 which
@@ -46,7 +46,7 @@ class InstantiatingConfigurationParameterConverterTests {
 		DisplayNameGenerator displayNameGenerator = converter.get(configurationParameters, KEY).orElseThrow();
 
 		assertThat(displayNameGenerator).isInstanceOf(CustomDisplayNameGenerator.class);
-		assertExpectedLogMessage(listener, Level.INFO,
+		assertExpectedLogMessage(listener, Level.CONFIG,
 			"Using default display name generator "
 					+ "'org.junit.jupiter.engine.descriptor.CustomDisplayNameGenerator' set via the "
 					+ "'junit.jupiter.displayname.generator.default' configuration parameter.");
@@ -87,7 +87,7 @@ class InstantiatingConfigurationParameterConverterTests {
 		DisplayNameGenerator displayNameGenerator = converter.get(configurationParameters, KEY).orElseThrow();
 
 		assertThat(displayNameGenerator).isInstanceOf(CustomDisplayNameGenerator.class);
-		assertExpectedLogMessage(listener, Level.INFO,
+		assertExpectedLogMessage(listener, Level.CONFIG,
 			"Using default display name generator "
 					+ "'org.junit.jupiter.engine.descriptor.CustomDisplayNameGenerator' set via the "
 					+ "'junit.jupiter.displayname.generator.default' configuration parameter.");

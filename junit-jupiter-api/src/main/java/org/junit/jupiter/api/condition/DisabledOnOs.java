@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2021 the original author or authors.
+ * Copyright 2015-2022 the original author or authors.
  *
  * All rights reserved. This program and the accompanying materials are
  * made available under the terms of the Eclipse Public License v2.0 which
@@ -24,10 +24,15 @@ import org.junit.jupiter.api.extension.ExtendWith;
 /**
  * {@code @DisabledOnOs} is used to signal that the annotated test class or
  * test method is <em>disabled</em> on one or more specified
- * {@linkplain #value operating systems}.
+ * {@linkplain #value operating systems} or on one or more specified
+ * {@linkplain #architectures architectures}
+ *
+ * <p>If operating systems <em>and</em> architectures are specified, the annotated
+ * test class or test method is disabled if both conditions apply.
  *
  * <p>When applied at the class level, all test methods within that class
- * will be disabled on the same specified operating systems.
+ * will be disabled on the same specified operating systems, architectures, or
+ * the specified combinations of both.
  *
  * <p>If a test method is disabled via this annotation, that does not prevent
  * the test class from being instantiated. Rather, it prevents the execution of
@@ -38,7 +43,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
  * custom <em>composed annotation</em> that inherits the semantics of this
  * annotation.
  *
- * <h4>Warning</h4>
+ * <h2>Warning</h2>
  *
  * <p>As of JUnit Jupiter 5.1, this annotation can only be declared once on an
  * {@link java.lang.reflect.AnnotatedElement AnnotatedElement} (i.e., test
@@ -77,11 +82,29 @@ public @interface DisabledOnOs {
 	 *
 	 * @see OS
 	 */
-	OS[] value();
+	OS[] value() default {};
 
 	/**
-	 * Reason to provide if the test of container ends up being disabled.
+	 * Architectures on which the annotated class or method should be disabled.
+	 *
+	 * <p>Each architecture will be compared to the value returned from
+	 * {@code System.getProperty("os.arch")}, ignoring case.
+	 *
+	 * @since 5.9
 	 */
+	@API(status = STABLE, since = "5.9")
+	String[] architectures() default {};
+
+	/**
+	 * Custom reason to provide if the test or container is disabled.
+	 *
+	 * <p>If a custom reason is supplied, it will be combined with the default
+	 * reason for this annotation. If a custom reason is not supplied, the default
+	 * reason will be used.
+	 *
+	 * @since 5.7
+	 */
+	@API(status = STABLE, since = "5.7")
 	String disabledReason() default "";
 
 }

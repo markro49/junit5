@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2021 the original author or authors.
+ * Copyright 2015-2022 the original author or authors.
  *
  * All rights reserved. This program and the accompanying materials are
  * made available under the terms of the Eclipse Public License v2.0 which
@@ -12,6 +12,7 @@ package org.junit.jupiter.engine.descriptor;
 
 import static org.apiguardian.api.API.Status.INTERNAL;
 import static org.junit.jupiter.engine.descriptor.ExtensionUtils.populateNewExtensionRegistryFromExtendWithAnnotation;
+import static org.junit.jupiter.engine.descriptor.ExtensionUtils.registerExtensionsFromExecutableParameters;
 import static org.junit.jupiter.engine.support.JupiterThrowableCollectorFactory.createThrowableCollector;
 
 import java.lang.reflect.Method;
@@ -22,6 +23,7 @@ import org.junit.jupiter.api.extension.AfterEachCallback;
 import org.junit.jupiter.api.extension.AfterTestExecutionCallback;
 import org.junit.jupiter.api.extension.BeforeEachCallback;
 import org.junit.jupiter.api.extension.BeforeTestExecutionCallback;
+import org.junit.jupiter.api.extension.ExecutableInvoker;
 import org.junit.jupiter.api.extension.Extension;
 import org.junit.jupiter.api.extension.ExtensionContext;
 import org.junit.jupiter.api.extension.InvocationInterceptor;
@@ -33,8 +35,9 @@ import org.junit.jupiter.api.extension.TestWatcher;
 import org.junit.jupiter.engine.config.JupiterConfiguration;
 import org.junit.jupiter.engine.execution.AfterEachMethodAdapter;
 import org.junit.jupiter.engine.execution.BeforeEachMethodAdapter;
-import org.junit.jupiter.engine.execution.ExecutableInvoker;
-import org.junit.jupiter.engine.execution.ExecutableInvoker.ReflectiveInterceptorCall;
+import org.junit.jupiter.engine.execution.DefaultExecutableInvoker;
+import org.junit.jupiter.engine.execution.InterceptingExecutableInvoker;
+import org.junit.jupiter.engine.execution.InterceptingExecutableInvoker.ReflectiveInterceptorCall;
 import org.junit.jupiter.engine.execution.JupiterEngineExecutionContext;
 import org.junit.jupiter.engine.extension.ExtensionRegistry;
 import org.junit.jupiter.engine.extension.MutableExtensionRegistry;
@@ -47,7 +50,7 @@ import org.junit.platform.engine.support.hierarchical.ThrowableCollector;
 /**
  * {@link TestDescriptor} for {@link org.junit.jupiter.api.Test @Test} methods.
  *
- * <h3>Default Display Names</h3>
+ * <h2>Default Display Names</h2>
  *
  * <p>The default display name for a test method is the name of the method
  * concatenated with a comma-separated list of parameter types in parentheses.
@@ -66,7 +69,7 @@ import org.junit.platform.engine.support.hierarchical.ThrowableCollector;
 public class TestMethodTestDescriptor extends MethodBasedTestDescriptor {
 
 	public static final String SEGMENT_TYPE = "method";
-	private static final ExecutableInvoker executableInvoker = new ExecutableInvoker();
+	private static final InterceptingExecutableInvoker executableInvoker = new InterceptingExecutableInvoker();
 	private static final ReflectiveInterceptorCall<Method, Void> defaultInterceptorCall = ReflectiveInterceptorCall.ofVoidMethod(
 		InvocationInterceptor::interceptTestMethod);
 
@@ -95,8 +98,9 @@ public class TestMethodTestDescriptor extends MethodBasedTestDescriptor {
 	public JupiterEngineExecutionContext prepare(JupiterEngineExecutionContext context) {
 		MutableExtensionRegistry registry = populateNewExtensionRegistry(context);
 		ThrowableCollector throwableCollector = createThrowableCollector();
+		ExecutableInvoker executableInvoker = new DefaultExecutableInvoker(context);
 		MethodExtensionContext extensionContext = new MethodExtensionContext(context.getExtensionContext(),
-			context.getExecutionListener(), this, context.getConfiguration(), throwableCollector);
+			context.getExecutionListener(), this, context.getConfiguration(), throwableCollector, executableInvoker);
 		throwableCollector.execute(() -> {
 			TestInstances testInstances = context.getTestInstancesProvider().getTestInstances(registry,
 				throwableCollector);
@@ -113,7 +117,10 @@ public class TestMethodTestDescriptor extends MethodBasedTestDescriptor {
 	}
 
 	protected MutableExtensionRegistry populateNewExtensionRegistry(JupiterEngineExecutionContext context) {
-		return populateNewExtensionRegistryFromExtendWithAnnotation(context.getExtensionRegistry(), getTestMethod());
+		MutableExtensionRegistry registry = populateNewExtensionRegistryFromExtendWithAnnotation(
+			context.getExtensionRegistry(), getTestMethod());
+		registerExtensionsFromExecutableParameters(registry, getTestMethod());
+		return registry;
 	}
 
 	@Override
@@ -145,7 +152,7 @@ public class TestMethodTestDescriptor extends MethodBasedTestDescriptor {
 		if (isPerMethodLifecycle(context) && context.getExtensionContext().getTestInstance().isPresent()) {
 			invokeTestInstancePreDestroyCallbacks(context);
 		}
-		super.cleanUp(context);
+		context.getThrowableCollector().execute(() -> super.cleanUp(context));
 		context.getThrowableCollector().assertEmpty();
 	}
 

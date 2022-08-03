@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2021 the original author or authors.
+ * Copyright 2015-2022 the original author or authors.
  *
  * All rights reserved. This program and the accompanying materials are
  * made available under the terms of the Eclipse Public License v2.0 which
@@ -15,6 +15,7 @@ import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.Timeout.ThreadMode;
 
 // tag::user_guide[]
 class TimeoutDemo {
@@ -26,9 +27,15 @@ class TimeoutDemo {
 	}
 
 	@Test
-	@Timeout(value = 100, unit = TimeUnit.MILLISECONDS)
-	void failsIfExecutionTimeExceeds100Milliseconds() {
-		// fails if execution time exceeds 100 milliseconds
+	@Timeout(value = 500, unit = TimeUnit.MILLISECONDS)
+	void failsIfExecutionTimeExceeds500Milliseconds() {
+		// fails if execution time exceeds 500 milliseconds
+	}
+
+	@Test
+	@Timeout(value = 500, unit = TimeUnit.MILLISECONDS, threadMode = ThreadMode.SEPARATE_THREAD)
+	void failsIfExecutionTimeExceeds500MillisecondsInSeparateThread() {
+		// fails if execution time exceeds 500 milliseconds, the test code is executed in a separate thread
 	}
 
 }

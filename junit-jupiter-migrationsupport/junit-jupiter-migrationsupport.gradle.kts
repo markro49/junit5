@@ -1,5 +1,3 @@
-import aQute.bnd.gradle.BundleTaskConvention;
-
 plugins {
 	`java-library-conventions`
 	`junit4-compatibility`
@@ -9,23 +7,27 @@ plugins {
 description = "JUnit Jupiter Migration Support"
 
 dependencies {
-	api(platform(projects.bom))
+	api(platform(projects.junitBom))
 	api(libs.junit4)
-	api(libs.apiguardian)
-	api(projects.jupiter.api)
+	api(projects.junitJupiterApi)
 
-	testImplementation(projects.jupiter.engine)
-	testImplementation(projects.platform.launcher)
-	testImplementation(projects.platform.runner)
-	testImplementation(projects.platform.testkit)
+	compileOnlyApi(libs.apiguardian)
+
+	testImplementation(projects.junitJupiterEngine)
+	testImplementation(projects.junitPlatformLauncher)
+	testImplementation(projects.junitPlatformSuiteEngine)
+	testImplementation(projects.junitPlatformTestkit)
+
+	osgiVerification(projects.junitJupiterEngine)
+	osgiVerification(projects.junitPlatformLauncher)
 }
 
 tasks.jar {
-	withConvention(BundleTaskConvention::class) {
+	bundle {
 		bnd("""
 			# Import JUnit4 packages with a version
 			Import-Package: \
-				!org.apiguardian.api,\
+				${extra["importAPIGuardian"]},\
 				org.junit;version="[${libs.versions.junit4Min.get()},5)",\
 				org.junit.platform.commons.logging;status=INTERNAL,\
 				org.junit.rules;version="[${libs.versions.junit4Min.get()},5)",\

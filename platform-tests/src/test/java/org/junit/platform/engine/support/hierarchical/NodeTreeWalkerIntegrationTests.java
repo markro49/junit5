@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2021 the original author or authors.
+ * Copyright 2015-2022 the original author or authors.
  *
  * All rights reserved. This program and the accompanying materials are
  * made available under the terms of the Eclipse Public License v2.0 which
@@ -48,7 +48,7 @@ class NodeTreeWalkerIntegrationTests {
 
 		var testClassDescriptor = getOnlyElement(engineDescriptor.getChildren());
 		assertThat(advisor.getResourceLock(testClassDescriptor)).extracting(allLocks()) //
-				.isEqualTo(List.of(getReadWriteLock("a"), getReadWriteLock("b")));
+				.isEqualTo(List.of(getLock(GLOBAL_READ), getReadWriteLock("a"), getReadWriteLock("b")));
 		assertThat(advisor.getForcedExecutionMode(testClassDescriptor)).isEmpty();
 
 		var testMethodDescriptor = getOnlyElement(testClassDescriptor.getChildren());
@@ -64,7 +64,7 @@ class NodeTreeWalkerIntegrationTests {
 
 		var testClassDescriptor = getOnlyElement(engineDescriptor.getChildren());
 		assertThat(advisor.getResourceLock(testClassDescriptor)).extracting(allLocks()) //
-				.isEqualTo(List.of(getReadWriteLock("a")));
+				.isEqualTo(List.of(getLock(GLOBAL_READ), getReadWriteLock("a")));
 		assertThat(advisor.getForcedExecutionMode(testClassDescriptor)).isEmpty();
 
 		var testMethodDescriptor = getOnlyElement(testClassDescriptor.getChildren());
@@ -80,7 +80,7 @@ class NodeTreeWalkerIntegrationTests {
 
 		var testClassDescriptor = getOnlyElement(engineDescriptor.getChildren());
 		assertThat(advisor.getResourceLock(testClassDescriptor)).extracting(allLocks()) //
-				.isEqualTo(List.of(getReadLock("a")));
+				.isEqualTo(List.of(getLock(GLOBAL_READ), getReadLock("a")));
 		assertThat(advisor.getForcedExecutionMode(testClassDescriptor)).isEmpty();
 
 		var testMethodDescriptor = getOnlyElement(testClassDescriptor.getChildren());
@@ -90,13 +90,13 @@ class NodeTreeWalkerIntegrationTests {
 
 	@Test
 	void setsForceExecutionModeForChildrenWithReadLocksOnClassAndWriteLockOnTest() {
-		var engineDescriptor = discover(TestCaseWithResourceReadLockOnClassAndWriteClockOnTest.class);
+		var engineDescriptor = discover(TestCaseWithResourceReadLockOnClassAndWriteClockOnTestCase.class);
 
 		var advisor = nodeTreeWalker.walk(engineDescriptor);
 
 		var testClassDescriptor = getOnlyElement(engineDescriptor.getChildren());
 		assertThat(advisor.getResourceLock(testClassDescriptor)).extracting(allLocks()) //
-				.isEqualTo(List.of(getReadWriteLock("a")));
+				.isEqualTo(List.of(getLock(GLOBAL_READ), getReadWriteLock("a")));
 		assertThat(advisor.getForcedExecutionMode(testClassDescriptor)).isEmpty();
 
 		var testMethodDescriptor = getOnlyElement(testClassDescriptor.getChildren());
@@ -106,13 +106,13 @@ class NodeTreeWalkerIntegrationTests {
 
 	@Test
 	void doesntSetForceExecutionModeForChildrenWithReadLocksOnClassAndReadLockOnTest() {
-		var engineDescriptor = discover(TestCaseWithResourceReadLockOnClassAndReadClockOnTest.class);
+		var engineDescriptor = discover(TestCaseWithResourceReadLockOnClassAndReadClockOnTestCase.class);
 
 		var advisor = nodeTreeWalker.walk(engineDescriptor);
 
 		var testClassDescriptor = getOnlyElement(engineDescriptor.getChildren());
 		assertThat(advisor.getResourceLock(testClassDescriptor)).extracting(allLocks()) //
-				.isEqualTo(List.of(getReadLock("a"), getReadLock("b")));
+				.isEqualTo(List.of(getLock(GLOBAL_READ), getReadLock("a"), getReadLock("b")));
 		assertThat(advisor.getForcedExecutionMode(testClassDescriptor)).isEmpty();
 
 		var testMethodDescriptor = getOnlyElement(testClassDescriptor.getChildren());
@@ -240,7 +240,7 @@ class NodeTreeWalkerIntegrationTests {
 	}
 
 	@ResourceLock(value = "a", mode = ResourceAccessMode.READ)
-	static class TestCaseWithResourceReadLockOnClassAndWriteClockOnTest {
+	static class TestCaseWithResourceReadLockOnClassAndWriteClockOnTestCase {
 		@Test
 		@ResourceLock("a")
 		void test() {
@@ -248,7 +248,7 @@ class NodeTreeWalkerIntegrationTests {
 	}
 
 	@ResourceLock(value = "a", mode = ResourceAccessMode.READ)
-	static class TestCaseWithResourceReadLockOnClassAndReadClockOnTest {
+	static class TestCaseWithResourceReadLockOnClassAndReadClockOnTestCase {
 		@Test
 		@ResourceLock(value = "b", mode = ResourceAccessMode.READ)
 		void test() {

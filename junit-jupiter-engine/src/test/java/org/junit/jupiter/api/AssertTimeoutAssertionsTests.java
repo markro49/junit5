@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2021 the original author or authors.
+ * Copyright 2015-2022 the original author or authors.
  *
  * All rights reserved. This program and the accompanying materials are
  * made available under the terms of the Eclipse Public License v2.0 which
@@ -21,7 +21,9 @@ import static org.junit.jupiter.api.Assertions.assertTimeout;
 import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
+import static org.junit.jupiter.api.condition.OS.WINDOWS;
 
+import java.time.Duration;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
@@ -36,6 +38,8 @@ import org.opentest4j.AssertionFailedError;
  * @since 5.0
  */
 class AssertTimeoutAssertionsTests {
+
+	private static final Duration PREEMPTIVE_TIMEOUT = ofMillis(WINDOWS.isCurrentOs() ? 1000 : 100);
 
 	private static ThreadLocal<AtomicBoolean> changed = ThreadLocal.withInitial(() -> new AtomicBoolean(false));
 
@@ -189,8 +193,8 @@ class AssertTimeoutAssertionsTests {
 	@Test
 	void assertTimeoutPreemptivelyForExecutableThatCompletesAfterTheTimeout() {
 		AssertionFailedError error = assertThrows(AssertionFailedError.class,
-			() -> assertTimeoutPreemptively(ofMillis(10), this::waitForInterrupt));
-		assertMessageEquals(error, "execution timed out after 10 ms");
+			() -> assertTimeoutPreemptively(PREEMPTIVE_TIMEOUT, this::waitForInterrupt));
+		assertMessageEquals(error, "execution timed out after " + PREEMPTIVE_TIMEOUT.toMillis() + " ms");
 		assertMessageStartsWith(error.getCause(), "Execution timed out in ");
 		assertStackTraceContains(error.getCause().getStackTrace(), "CountDownLatch", "await");
 	}
@@ -198,8 +202,9 @@ class AssertTimeoutAssertionsTests {
 	@Test
 	void assertTimeoutPreemptivelyWithMessageForExecutableThatCompletesAfterTheTimeout() {
 		AssertionFailedError error = assertThrows(AssertionFailedError.class,
-			() -> assertTimeoutPreemptively(ofMillis(10), this::waitForInterrupt, "Tempus Fugit"));
-		assertMessageEquals(error, "Tempus Fugit ==> execution timed out after 10 ms");
+			() -> assertTimeoutPreemptively(PREEMPTIVE_TIMEOUT, this::waitForInterrupt, "Tempus Fugit"));
+		assertMessageEquals(error,
+			"Tempus Fugit ==> execution timed out after " + PREEMPTIVE_TIMEOUT.toMillis() + " ms");
 		assertMessageStartsWith(error.getCause(), "Execution timed out in ");
 		assertStackTraceContains(error.getCause().getStackTrace(), "CountDownLatch", "await");
 	}
@@ -207,8 +212,10 @@ class AssertTimeoutAssertionsTests {
 	@Test
 	void assertTimeoutPreemptivelyWithMessageSupplierForExecutableThatCompletesAfterTheTimeout() {
 		AssertionFailedError error = assertThrows(AssertionFailedError.class,
-			() -> assertTimeoutPreemptively(ofMillis(10), this::waitForInterrupt, () -> "Tempus" + " " + "Fugit"));
-		assertMessageEquals(error, "Tempus Fugit ==> execution timed out after 10 ms");
+			() -> assertTimeoutPreemptively(PREEMPTIVE_TIMEOUT, this::waitForInterrupt,
+				() -> "Tempus" + " " + "Fugit"));
+		assertMessageEquals(error,
+			"Tempus Fugit ==> execution timed out after " + PREEMPTIVE_TIMEOUT.toMillis() + " ms");
 		assertMessageStartsWith(error.getCause(), "Execution timed out in ");
 		assertStackTraceContains(error.getCause().getStackTrace(), "CountDownLatch", "await");
 	}
@@ -258,12 +265,13 @@ class AssertTimeoutAssertionsTests {
 	@Test
 	void assertTimeoutPreemptivelyForSupplierThatCompletesAfterTheTimeout() {
 		AssertionFailedError error = assertThrows(AssertionFailedError.class, () -> {
-			assertTimeoutPreemptively(ofMillis(10), () -> {
+			assertTimeoutPreemptively(PREEMPTIVE_TIMEOUT, () -> {
 				waitForInterrupt();
 				return "Tempus Fugit";
 			});
 		});
-		assertMessageEquals(error, "execution timed out after 10 ms");
+
+		assertMessageEquals(error, "execution timed out after " + PREEMPTIVE_TIMEOUT.toMillis() + " ms");
 		assertMessageStartsWith(error.getCause(), "Execution timed out in ");
 		assertStackTraceContains(error.getCause().getStackTrace(), "CountDownLatch", "await");
 	}
@@ -271,12 +279,14 @@ class AssertTimeoutAssertionsTests {
 	@Test
 	void assertTimeoutPreemptivelyWithMessageForSupplierThatCompletesAfterTheTimeout() {
 		AssertionFailedError error = assertThrows(AssertionFailedError.class, () -> {
-			assertTimeoutPreemptively(ofMillis(10), () -> {
+			assertTimeoutPreemptively(PREEMPTIVE_TIMEOUT, () -> {
 				waitForInterrupt();
 				return "Tempus Fugit";
 			}, "Tempus Fugit");
 		});
-		assertMessageEquals(error, "Tempus Fugit ==> execution timed out after 10 ms");
+
+		assertMessageEquals(error,
+			"Tempus Fugit ==> execution timed out after " + PREEMPTIVE_TIMEOUT.toMillis() + " ms");
 		assertMessageStartsWith(error.getCause(), "Execution timed out in ");
 		assertStackTraceContains(error.getCause().getStackTrace(), "CountDownLatch", "await");
 	}
@@ -284,12 +294,14 @@ class AssertTimeoutAssertionsTests {
 	@Test
 	void assertTimeoutPreemptivelyWithMessageSupplierForSupplierThatCompletesAfterTheTimeout() {
 		AssertionFailedError error = assertThrows(AssertionFailedError.class, () -> {
-			assertTimeoutPreemptively(ofMillis(10), () -> {
+			assertTimeoutPreemptively(PREEMPTIVE_TIMEOUT, () -> {
 				waitForInterrupt();
 				return "Tempus Fugit";
 			}, () -> "Tempus" + " " + "Fugit");
 		});
-		assertMessageEquals(error, "Tempus Fugit ==> execution timed out after 10 ms");
+
+		assertMessageEquals(error,
+			"Tempus Fugit ==> execution timed out after " + PREEMPTIVE_TIMEOUT.toMillis() + " ms");
 		assertMessageStartsWith(error.getCause(), "Execution timed out in ");
 		assertStackTraceContains(error.getCause().getStackTrace(), "CountDownLatch", "await");
 	}
@@ -315,6 +327,7 @@ class AssertTimeoutAssertionsTests {
 
 	private void waitForInterrupt() {
 		try {
+			assertFalse(Thread.interrupted(), "Already interrupted");
 			new CountDownLatch(1).await();
 		}
 		catch (InterruptedException ignore) {

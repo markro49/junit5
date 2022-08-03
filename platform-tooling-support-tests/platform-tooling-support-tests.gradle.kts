@@ -10,6 +10,10 @@ javaLibrary {
 	mainJavaVersion = JavaVersion.VERSION_11
 }
 
+val thirdPartyJars by configurations.creating
+val antJars by configurations.creating
+val mavenDistribution by configurations.creating
+
 dependencies {
 	implementation(libs.bartholdy) {
 		because("manage external tool installations")
@@ -21,7 +25,10 @@ dependencies {
 	testImplementation(libs.archunit) {
 		because("checking the architecture of JUnit 5")
 	}
-	testImplementation(libs.groovy3) {
+	testImplementation(libs.apiguardian) {
+		because("we validate that public classes are annotated")
+	}
+	testImplementation(libs.groovy4) {
 		because("it provides convenience methods to handle process output")
 	}
 	testImplementation(libs.bnd) {
@@ -30,33 +37,58 @@ dependencies {
 	testRuntimeOnly(libs.slf4j.julBinding) {
 		because("provide appropriate SLF4J binding")
 	}
+	testImplementation(libs.ant) {
+		because("we reference Ant's main class")
+	}
+
+	thirdPartyJars(libs.junit4)
+	thirdPartyJars(libs.assertj)
+	thirdPartyJars(libs.apiguardian)
+	thirdPartyJars(libs.hamcrest)
+	thirdPartyJars(libs.opentest4j)
+
+	antJars(platform(projects.junitBom))
+	antJars(libs.bundles.ant)
+	antJars(projects.junitPlatformConsoleStandalone)
+	antJars(projects.junitPlatformLauncher)
+
+	mavenDistribution(libs.maven) {
+		artifact {
+			classifier = "bin"
+			type = "zip"
+			isTransitive = false
+		}
+	}
+}
+
+val unzipMavenDistribution by tasks.registering(Copy::class) {
+	from(zipTree(mavenDistribution.elements.map { it.single() }))
+	into(layout.buildDirectory.dir("maven-distribution"))
 }
 
 tasks.test {
-	// Opt-in via system property: '-Dplatform.tooling.support.tests.enabled=true'
-	enabled = System.getProperty("platform.tooling.support.tests.enabled")?.toBoolean() ?: false
+	// Opt-out via system property: '-Dplatform.tooling.support.tests.enabled=false'
+	enabled = System.getProperty("platform.tooling.support.tests.enabled")?.toBoolean() ?: true
 
 	// The following if-block is necessary since Gradle will otherwise
 	// always publish all mavenizedProjects even if this "test" task
 	// is not executed.
 	if (enabled) {
+
 		// All maven-aware projects must be installed, i.e. published to the local repository
 		val mavenizedProjects: List<Project> by rootProject
 		val tempRepoName: String by rootProject
 
-		(mavenizedProjects + projects.bom)
-				.map { project -> project.tasks.named("publishAllPublicationsTo${tempRepoName.capitalize()}Repository") }
-				.forEach { dependsOn(it) }
+		(mavenizedProjects + projects.junitBom.dependencyProject)
+			.map { project -> project.tasks.named("publishAllPublicationsTo${tempRepoName.capitalize()}Repository") }
+			.forEach { dependsOn(it) }
 	}
 
 	val tempRepoDir: File by rootProject
 	jvmArgumentProviders += MavenRepo(tempRepoDir)
-
-	// Pass version constants (declared in Versions.kt) to tests as system properties
-	systemProperty("Versions.apiGuardian", libs.versions.apiguardian.get())
-	systemProperty("Versions.assertJ", libs.versions.assertj.get())
-	systemProperty("Versions.junit4", libs.versions.junit4.get())
-	systemProperty("Versions.ota4j", libs.versions.opentest4j.get())
+	jvmArgumentProviders += JarPath(thirdPartyJars)
+	jvmArgumentProviders += JarPath(antJars)
+	jvmArgumentProviders += MavenDistribution(project, unzipMavenDistribution)
 
 	(options as JUnitPlatformOptions).apply {
 		includeEngines("archunit")
@@ -77,8 +109,6 @@ tasks.test {
 		requirements.add("jdk=8")
 	}
 	jvmArgumentProviders += JavaHomeDir(project, 8)
-
-	maxParallelForks = 1 // Bartholdy.install is not parallel safe, see https://github.com/sormuras/bartholdy/issues/4
 }
 
 class MavenRepo(@get:InputDirectory @get:PathSensitive(RELATIVE) val repoDir: File) : CommandLineArgumentProvider {
@@ -109,4 +139,17 @@ class JavaHomeDir(project: Project, @Input val version: Int) : CommandLineArgume
 		}
 		return emptyList()
 	}
+}
+
+class JarPath(@Classpath val configuration: Configuration, @Input val key: String = configuration.name) : CommandLineArgumentProvider {
+	override fun asArguments() = listOf("-D${key}=${configuration.asPath}")
+}
+
+class MavenDistribution(project: Project, sourceTask: TaskProvider<*>) : CommandLineArgumentProvider {
+	@InputDirectory
+	@PathSensitive(RELATIVE)
+	val mavenDistribution: DirectoryProperty = project.objects.directoryProperty()
+		.value(project.layout.dir(sourceTask.map { it.outputs.files.singleFile.listFiles()!!.single() }))
+
+	override fun asArguments() = listOf("-DmavenDistribution=${mavenDistribution.get().asFile.absolutePath}")
 }
