@@ -14,6 +14,8 @@ dependencies {
 
 	compileOnly(kotlin("stdlib"))
 
+	compileOnly("org.checkerframework:checker-qual:3.26.0")
+
 	osgiVerification(projects.junitJupiterEngine)
 	osgiVerification(projects.junitPlatformLauncher)
 }
