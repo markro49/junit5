@@ -10,7 +10,7 @@ dependencies {
 	api(platform(projects.junitBom))
 	api(libs.junit4)
 	api(projects.junitJupiterApi)
-
+compileOnly("org.checkerframework:checker-qual:3.26.0")
 	compileOnlyApi(libs.apiguardian)
 
 	testImplementation(projects.junitJupiterEngine)

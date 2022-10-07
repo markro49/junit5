@@ -9,6 +9,7 @@ description = "JUnit Jupiter Params"
 dependencies {
 	api(platform(projects.junitBom))
 	api(projects.junitJupiterApi)
+compileOnly("org.checkerframework:checker-qual:3.26.0")
 
 	compileOnlyApi(libs.apiguardian)
 
