@@ -15,7 +15,7 @@ module org.junit.jupiter.api {
 	requires static transitive org.apiguardian.api;
 	requires transitive org.junit.platform.commons;
 	requires transitive org.opentest4j;
-        requires transitive org.checkerframework.checker.qual;
+	requires transitive org.checkerframework.checker.qual;
 
 	exports org.junit.jupiter.api;
 	exports org.junit.jupiter.api.condition;
