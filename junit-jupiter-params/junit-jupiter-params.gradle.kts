@@ -26,6 +26,7 @@ dependencies {
 
 	osgiVerification(projects.junitJupiterEngine)
 	osgiVerification(projects.junitPlatformLauncher)
+	osgiVerification("org.checkerframework:checker-qual:3.26.0")
 }
 
 tasks {

@@ -27,6 +27,7 @@ dependencies {
 	testImplementation(libs.groovy4)
 
 	osgiVerification(projects.junitPlatformLauncher)
+	osgiVerification("org.checkerframework:checker-qual:3.26.0")
 }
 
 tasks {
