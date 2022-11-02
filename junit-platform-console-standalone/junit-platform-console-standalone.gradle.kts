@@ -6,6 +6,7 @@ plugins {
 description = "JUnit Platform Console Standalone"
 
 dependencies {
+	osgiVerification("org.checkerframework:checker-qual:3.26.0")
 	shadowed(projects.junitPlatformReporting)
 	shadowed(projects.junitPlatformConsole)
 	shadowed(projects.junitPlatformSuite)

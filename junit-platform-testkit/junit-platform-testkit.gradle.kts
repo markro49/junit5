@@ -11,6 +11,7 @@ dependencies {
 	api(projects.junitPlatformLauncher)
 
 	compileOnlyApi(libs.apiguardian)
+	compileOnly("org.checkerframework:checker-qual:3.26.0")
 
 	osgiVerification(projects.junitJupiterEngine)
 	osgiVerification(projects.junitPlatformLauncher)

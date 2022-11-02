@@ -11,6 +11,7 @@ dependencies {
 	api(libs.junit4)
 	api(projects.junitJupiterApi)
 
+	compileOnly("org.checkerframework:checker-qual:3.26.0")
 	compileOnlyApi(libs.apiguardian)
 
 	testImplementation(projects.junitJupiterEngine)
@@ -20,6 +21,7 @@ dependencies {
 
 	osgiVerification(projects.junitJupiterEngine)
 	osgiVerification(projects.junitPlatformLauncher)
+	osgiVerification("org.checkerframework:checker-qual:3.26.0")
 }
 
 tasks.jar {
