@@ -35,7 +35,7 @@ public class JupiterEngineDescriptor extends EngineDescriptor implements Node<Ju
 	private final JupiterConfiguration configuration;
 
 	public JupiterEngineDescriptor(UniqueId uniqueId, JupiterConfiguration configuration) {
-		super(uniqueId, "JUnit Jupiter Daikon");
+		super(uniqueId, "JUnit Jupiter");
 		this.configuration = configuration;
 	}
 
