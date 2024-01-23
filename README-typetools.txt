@@ -14,6 +14,22 @@ You need to use JDK 17 to build JUnit 5.
 To build this project
 ---------------------
 
+  (If you have not already done so:)
+  git clone git@github.com:typetools/junit5.git
+  cd junit5
+
+You now need to modify one file:
+  junit-jupiter-engine/src/main/java/org/junit/jupiter/engine/descriptor/JupiterEngineDescriptor.java
+
+The change identifies this version of the jar as being made for Daikon.
+@@ -37,3 +37,3 @@ public class JupiterEngineDescriptor extends EngineDescriptor implements Node<Ju
+        public JupiterEngineDescriptor(UniqueId uniqueId, JupiterConfiguration configuration) {
+-               super(uniqueId, "JUnit Jupiter");
++               super(uniqueId, "JUnit Jupiter Daikon");
+                this.configuration = configuration;
+
+After you have made the edit, build the jar file with:
+
 ```
 ./gradlew junit-platform-console-standalone:clean
 ./gradlew junit-platform-console-standalone:build
@@ -21,12 +37,15 @@ To build this project
 The result of the build will be:
  ./junit-platform-console-standalone/build/libs/junit-platform-console-standalone-1.9.0.jar
 
+Note: Do not check in the change to JupiterEngineDescriptor.java; this will cause the github
+CI tests to fail.
+
 Test it in a branch of Daikon:
  * copy the jar file to the `daikon/java/lib` directory adding '-Daikon' to the file name prior to '.jar'.
  * remove the old jar file (if the version number has changed)
- * in Daikon branch run: make compile daikon.jar dyncomp-jdk
+ * in a Daikon branch run: make compile daikon.jar dyncomp-jdk
  * run:  make MPARG=-j1 -C tests clean diffs
    If there are any errors, then fix the bugs in junit and/or Daikon.
- * push your branch, and ensure that the the Azure Pipelines tests pass
+ * push your Daikon branch, and ensure that the Azure Pipelines tests pass
  * merge your branch into master
 
